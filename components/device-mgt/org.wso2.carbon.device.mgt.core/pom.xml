@@ -81,9 +81,10 @@
                             org.wso2.carbon.ndatasource.core,
                             org.wso2.carbon.apimgt.impl,
                             org.wso2.carbon.ndatasource.core,
-                            org.apache.axis2.transport.mail,
                             org.apache.catalina,
-                            org.apache.catalina.core
+                            org.apache.catalina.core,
+                            org.apache.commons.collections,
+                            org.wso2.carbon.email.sender.*
                         </Import-Package>
                         <Export-Package>
                             !org.wso2.carbon.device.mgt.core.internal,
@@ -215,6 +216,14 @@
         <dependency>
             <groupId>org.wso2.tomcat</groupId>
             <artifactId>tomcat-servlet-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>commons-collections.wso2</groupId>
+            <artifactId>commons-collections</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.wso2.carbon.devicemgt</groupId>
+            <artifactId>org.wso2.carbon.email.sender.core</artifactId>
         </dependency>
     </dependencies>
 
