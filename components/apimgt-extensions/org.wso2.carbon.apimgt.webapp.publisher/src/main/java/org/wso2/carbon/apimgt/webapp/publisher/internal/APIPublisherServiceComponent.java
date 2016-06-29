@@ -25,6 +25,11 @@ import org.osgi.service.component.ComponentContext;
 import org.wso2.carbon.apimgt.impl.APIManagerConfigurationService;
 import org.wso2.carbon.apimgt.webapp.publisher.APIPublisherService;
 import org.wso2.carbon.apimgt.webapp.publisher.APIPublisherServiceImpl;
+import org.wso2.carbon.apimgt.webapp.publisher.APIPublisherStartupHandler;
+import org.wso2.carbon.apimgt.webapp.publisher.config.WebappPublisherConfig;
+import org.wso2.carbon.core.ServerStartupObserver;
+import org.wso2.carbon.registry.core.service.RegistryService;
+import org.wso2.carbon.user.core.service.RealmService;
 import org.wso2.carbon.utils.ConfigurationContextService;
 
 /**
@@ -35,6 +40,18 @@ import org.wso2.carbon.utils.ConfigurationContextService;
  * policy="dynamic"
  * bind="setConfigurationContextService"
  * unbind="unsetConfigurationContextService"
+ * @scr.reference name="user.realmservice.default"
+ * interface="org.wso2.carbon.user.core.service.RealmService"
+ * cardinality="1..1"
+ * policy="dynamic"
+ * bind="setRealmService"
+ * unbind="unsetRealmService"
+ * @scr.reference name="registry.service"
+ * interface="org.wso2.carbon.registry.core.service.RegistryService"
+ * cardinality="1..1"
+ * policy="dynamic"
+ * bind="setRegistryService"
+ * unbind="unsetRegistryService"
  */
 public class APIPublisherServiceComponent {
 
@@ -43,17 +60,23 @@ public class APIPublisherServiceComponent {
     protected void activate(ComponentContext componentContext) {
         try {
             if (log.isDebugEnabled()) {
-                log.debug("Initializing device management core bundle");
+                log.debug("Initializing webapp publisher bundle");
             }
+
+            if (log.isDebugEnabled()) {
+                log.debug("Loading webapp publisher configurations");
+            }
+            /* Initializing webapp publisher configuration */
+            WebappPublisherConfig.init();
 
             /* Registering declarative service instances exposed by DeviceManagementServiceComponent */
             this.registerServices(componentContext);
 
             if (log.isDebugEnabled()) {
-                log.debug("Device management core bundle has been successfully initialized");
+                log.debug("Webapp publisher bundle has been successfully initialized");
             }
         } catch (Throwable e) {
-            log.error("Error occurred while initializing device management core bundle", e);
+            log.error("Error occurred while initializing webapp publisher bundle", e);
         }
     }
 
@@ -71,6 +94,7 @@ public class APIPublisherServiceComponent {
         APIPublisherService publisher = new APIPublisherServiceImpl();
         APIPublisherDataHolder.getInstance().setApiPublisherService(publisher);
         bundleContext.registerService(APIPublisherService.class, publisher, null);
+        bundleContext.registerService(ServerStartupObserver.class, new APIPublisherStartupHandler(), null);
     }
 
     protected void setAPIManagerConfigurationService(APIManagerConfigurationService service) {
@@ -95,4 +119,28 @@ public class APIPublisherServiceComponent {
         APIPublisherDataHolder.getInstance().setConfigurationContextService(null);
     }
 
+    protected void setRealmService(RealmService realmService) {
+        if (log.isDebugEnabled()) {
+            log.debug("Setting Realm Service");
+        }
+        APIPublisherDataHolder.getInstance().setRealmService(realmService);
+    }
+
+    protected void unsetRealmService(RealmService realmService) {
+        if (log.isDebugEnabled()) {
+            log.debug("Unsetting Realm Service");
+        }
+        APIPublisherDataHolder.getInstance().setRealmService(null);
+    }
+
+    protected void setRegistryService(RegistryService registryService) {
+        if (registryService != null && log.isDebugEnabled()) {
+            log.debug("Registry service initialized");
+        }
+        APIPublisherDataHolder.getInstance().setRegistryService(registryService);
+    }
+
+    protected void unsetRegistryService(RegistryService registryService) {
+        APIPublisherDataHolder.getInstance().setRegistryService(null);
+    }
 }

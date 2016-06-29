@@ -17,10 +17,7 @@
  */
 package org.wso2.carbon.device.mgt.common.operation.mgt;
 
-import org.wso2.carbon.device.mgt.common.DeviceIdentifier;
-import org.wso2.carbon.device.mgt.common.DeviceManagementException;
-import org.wso2.carbon.device.mgt.common.PaginationRequest;
-import org.wso2.carbon.device.mgt.common.PaginationResult;
+import org.wso2.carbon.device.mgt.common.*;
 
 import java.util.List;
 
@@ -38,7 +35,7 @@ public interface OperationManager {
      * @throws OperationManagementException If some unusual behaviour is observed while adding the
      *                                      operation
      */
-    int addOperation(Operation operation, List<DeviceIdentifier> devices) throws OperationManagementException;
+    Activity addOperation(Operation operation, List<DeviceIdentifier> devices) throws OperationManagementException;
 
     /**
      * Method to retrieve the list of all operations to a device.
@@ -84,5 +81,15 @@ public interface OperationManager {
             throws OperationManagementException, DeviceManagementException;
 
     Operation getOperation(int operationId) throws OperationManagementException;
+
+    Activity getOperationByActivityId(String activity) throws OperationManagementException;
+
+    List<Operation> getOperationUpdatedAfter(long timestamp) throws OperationManagementException;
+
+    List<Activity> getActivitiesUpdatedAfter(long timestamp) throws OperationManagementException;
+
+    List<Activity> getActivitiesUpdatedAfter(long timestamp, int limit, int offset) throws OperationManagementException;
+
+    int getActivityCountUpdatedAfter(long timestamp) throws OperationManagementException;
 
 }

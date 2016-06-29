@@ -31,7 +31,7 @@ import org.wso2.carbon.certificate.mgt.core.impl.KeyStoreReader;
 import org.wso2.carbon.certificate.mgt.core.util.ConfigurationUtil;
 import org.wso2.carbon.device.mgt.common.PaginationRequest;
 import org.wso2.carbon.device.mgt.common.PaginationResult;
-import org.wso2.carbon.device.mgt.core.operation.mgt.dao.OperationManagementDAOFactory;
+import org.wso2.carbon.device.mgt.common.TransactionManagementException;
 
 import java.io.InputStream;
 import java.security.PrivateKey;
@@ -106,6 +106,10 @@ public class CertificateManagementServiceImpl implements CertificateManagementSe
         return certificateGenerator.verifyPEMSignature(requestCertificate);
     }
 
+    @Override public CertificateResponse verifySubjectDN(String requestDN) throws KeystoreException {
+        return certificateGenerator.verifyCertificateDN(requestDN);
+    }
+
     public X509Certificate extractCertificateFromSignature(String headerSignature) throws KeystoreException {
         return certificateGenerator.extractCertificateFromSignature(headerSignature);
     }
@@ -165,9 +169,40 @@ public class CertificateManagementServiceImpl implements CertificateManagementSe
     @Override
     public boolean removeCertificate(String serialNumber) throws CertificateManagementDAOException {
         try {
+            CertificateManagementDAOFactory.beginTransaction();
+            CertificateDAO certificateDAO = CertificateManagementDAOFactory.getCertificateDAO();
+            boolean status = certificateDAO.removeCertificate(serialNumber);
+            CertificateManagementDAOFactory.commitTransaction();
+            return status;
+        } catch (TransactionManagementException e) {
+            String errorMsg = "Error when deleting";
+            log.error(errorMsg, e);
+            throw new CertificateManagementDAOException(errorMsg, e);
+        } finally {
+            CertificateManagementDAOFactory.closeConnection();
+        }
+    }
+
+    @Override
+    public List<CertificateResponse> getCertificates() throws CertificateManagementDAOException {
+        try {
             CertificateManagementDAOFactory.openConnection();
             CertificateDAO certificateDAO = CertificateManagementDAOFactory.getCertificateDAO();
-            return certificateDAO.removeCertificate(serialNumber);
+            return certificateDAO.getAllCertificates();
+        } catch (SQLException e) {
+            String errorMsg = "Error when opening connection";
+            log.error(errorMsg, e);
+            throw new CertificateManagementDAOException(errorMsg, e);
+        } finally {
+            CertificateManagementDAOFactory.closeConnection();
+        }
+    }
+
+    @Override public List<CertificateResponse> searchCertificates(String serialNumber) throws CertificateManagementDAOException {
+        try {
+            CertificateManagementDAOFactory.openConnection();
+            CertificateDAO certificateDAO = CertificateManagementDAOFactory.getCertificateDAO();
+            return certificateDAO.searchCertificate(serialNumber);
         } catch (SQLException e) {
             String errorMsg = "Error when opening connection";
             log.error(errorMsg, e);

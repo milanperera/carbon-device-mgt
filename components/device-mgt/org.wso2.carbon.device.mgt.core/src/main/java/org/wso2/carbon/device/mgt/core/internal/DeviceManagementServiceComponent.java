@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
+ * Copyright (c) 2016, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
  *
  * WSO2 Inc. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
@@ -11,7 +11,7 @@
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
+ * KIND, either express or implied. See the License for the
  * specific language governing permissions and limitations
  * under the License.
  */
@@ -25,7 +25,7 @@ import org.wso2.carbon.apimgt.impl.APIManagerConfigurationService;
 import org.wso2.carbon.device.mgt.common.DeviceManagementException;
 import org.wso2.carbon.device.mgt.common.app.mgt.ApplicationManagementException;
 import org.wso2.carbon.device.mgt.common.authorization.DeviceAccessAuthorizationService;
-import org.wso2.carbon.device.mgt.common.configuration.mgt.TenantConfigurationManagementService;
+import org.wso2.carbon.device.mgt.common.configuration.mgt.PlatformConfigurationManagementService;
 import org.wso2.carbon.device.mgt.common.notification.mgt.NotificationManagementService;
 import org.wso2.carbon.device.mgt.common.operation.mgt.OperationManagementException;
 import org.wso2.carbon.device.mgt.common.operation.mgt.OperationManager;
@@ -41,15 +41,19 @@ import org.wso2.carbon.device.mgt.core.authorization.DeviceAccessAuthorizationSe
 import org.wso2.carbon.device.mgt.core.config.DeviceConfigurationManager;
 import org.wso2.carbon.device.mgt.core.config.DeviceManagementConfig;
 import org.wso2.carbon.device.mgt.core.config.datasource.DataSourceConfig;
-import org.wso2.carbon.device.mgt.core.config.tenant.TenantConfigurationManagementServiceImpl;
+import org.wso2.carbon.device.mgt.core.config.tenant.PlatformConfigurationManagementServiceImpl;
 import org.wso2.carbon.device.mgt.core.dao.DeviceManagementDAOFactory;
+import org.wso2.carbon.device.mgt.core.group.mgt.dao.GroupManagementDAOFactory;
 import org.wso2.carbon.device.mgt.core.notification.mgt.NotificationManagementServiceImpl;
 import org.wso2.carbon.device.mgt.core.notification.mgt.dao.NotificationManagementDAOFactory;
 import org.wso2.carbon.device.mgt.core.operation.mgt.OperationManagerImpl;
 import org.wso2.carbon.device.mgt.core.operation.mgt.dao.OperationManagementDAOFactory;
 import org.wso2.carbon.device.mgt.core.permission.mgt.PermissionManagerServiceImpl;
+import org.wso2.carbon.device.mgt.core.push.notification.mgt.PushNotificationProviderRepository;
 import org.wso2.carbon.device.mgt.core.service.DeviceManagementProviderService;
 import org.wso2.carbon.device.mgt.core.service.DeviceManagementProviderServiceImpl;
+import org.wso2.carbon.device.mgt.core.service.GroupManagementProviderService;
+import org.wso2.carbon.device.mgt.core.service.GroupManagementProviderServiceImpl;
 import org.wso2.carbon.device.mgt.core.util.DeviceManagementSchemaInitializer;
 import org.wso2.carbon.email.sender.core.service.EmailSenderService;
 import org.wso2.carbon.ndatasource.core.DataSourceService;
@@ -107,15 +111,31 @@ import java.util.List;
  */
 public class DeviceManagementServiceComponent {
 
-    private static Log log = LogFactory.getLog(DeviceManagementServiceComponent.class);
-
     private static final Object LOCK = new Object();
+    private static Log log = LogFactory.getLog(DeviceManagementServiceComponent.class);
     private static List<PluginInitializationListener> listeners = new ArrayList<>();
     private static List<DeviceManagementService> deviceManagers = new ArrayList<>();
     private static List<DeviceManagerStartupListener> startupListeners = new ArrayList<>();
     private DeviceManagementPluginRepository pluginRepository = new DeviceManagementPluginRepository();
 
-    private static final String EMAIL_TEMPLATE_DIR_RELATIVE_REGISTRY_PATH = "/email-templates";
+    public static void registerPluginInitializationListener(PluginInitializationListener listener) {
+        synchronized (LOCK) {
+            listeners.add(listener);
+            for (DeviceManagementService deviceManagementService : deviceManagers) {
+                listener.registerDeviceManagementService(deviceManagementService);
+            }
+        }
+    }
+
+    public static void registerStartupListener(DeviceManagerStartupListener startupListener) {
+        startupListeners.add(startupListener);
+    }
+
+    public static void notifyStartupListeners() {
+        for (DeviceManagerStartupListener startupListener : startupListeners) {
+            startupListener.notifyObserver();
+        }
+    }
 
     @SuppressWarnings("unused")
     protected void activate(ComponentContext componentContext) {
@@ -130,11 +150,23 @@ public class DeviceManagementServiceComponent {
 
             DataSourceConfig dsConfig = config.getDeviceManagementConfigRepository().getDataSourceConfig();
             DeviceManagementDAOFactory.init(dsConfig);
+            GroupManagementDAOFactory.init(dsConfig);
             NotificationManagementDAOFactory.init(dsConfig);
 
             OperationManagementDAOFactory.init(dsConfig);
-            /*Initialize Operation Manager*/
+
+            /* Initialize Operation Manager */
             this.initOperationsManager();
+
+            PushNotificationProviderRepository pushNotificationRepo = new PushNotificationProviderRepository();
+            List<String> pushNotificationProviders = config.getPushNotificationProviders();
+            if (pushNotificationProviders != null) {
+                for (String pushNoteProvider : pushNotificationProviders) {
+                    pushNotificationRepo.addProvider(pushNoteProvider);
+                }
+            }
+            DeviceManagementDataHolder.getInstance().setPushNotificationProviderRepository(pushNotificationRepo);
+
             /* If -Dsetup option enabled then create device management database schema */
             String setupOption =
                     System.getProperty(DeviceManagementConstants.Common.PROPERTY_SETUP);
@@ -165,15 +197,6 @@ public class DeviceManagementServiceComponent {
         //do nothing
     }
 
-    public static void registerPluginInitializationListener(PluginInitializationListener listener) {
-        synchronized (LOCK) {
-            listeners.add(listener);
-            for (DeviceManagementService deviceManagementService : deviceManagers) {
-                listener.registerDeviceManagementService(deviceManagementService);
-            }
-        }
-    }
-
     private void initOperationsManager() throws OperationManagementException {
         OperationManager operationManager = new OperationManagerImpl();
         DeviceManagementDataHolder.getInstance().setOperationManager(operationManager);
@@ -189,10 +212,15 @@ public class DeviceManagementServiceComponent {
         DeviceManagementDataHolder.getInstance().setDeviceManagementProvider(deviceManagementProvider);
         bundleContext.registerService(DeviceManagementProviderService.class.getName(), deviceManagementProvider, null);
 
+        /* Registering Group Management Service */
+        GroupManagementProviderService groupManagementProvider = new GroupManagementProviderServiceImpl();
+        DeviceManagementDataHolder.getInstance().setGroupManagementProviderService(groupManagementProvider);
+        bundleContext.registerService(GroupManagementProviderService.class.getName(), groupManagementProvider, null);
+
 	    /* Registering Tenant Configuration Management Service */
-        TenantConfigurationManagementService
-                tenantConfiguration = new TenantConfigurationManagementServiceImpl();
-        bundleContext.registerService(TenantConfigurationManagementService.class.getName(), tenantConfiguration, null);
+        PlatformConfigurationManagementService
+                tenantConfiguration = new PlatformConfigurationManagementServiceImpl();
+        bundleContext.registerService(PlatformConfigurationManagementService.class.getName(), tenantConfiguration, null);
 
         /* Registering Notification Service */
         NotificationManagementService notificationManagementService
@@ -363,16 +391,6 @@ public class DeviceManagementServiceComponent {
             log.debug("Un-setting Email Sender Service");
         }
         DeviceManagementDataHolder.getInstance().setEmailSenderService(null);
-    }
-
-    public static void registerStartupListener(DeviceManagerStartupListener startupListener) {
-        startupListeners.add(startupListener);
-    }
-
-    public static void notifyStartupListeners() {
-        for (DeviceManagerStartupListener startupListener : startupListeners) {
-            startupListener.notifyObserver();
-        }
     }
 
 }

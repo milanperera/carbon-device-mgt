@@ -20,6 +20,7 @@ package org.wso2.carbon.device.mgt.core.config;
 import org.wso2.carbon.device.mgt.core.config.datasource.DataSourceConfig;
 import org.wso2.carbon.device.mgt.core.config.identity.IdentityConfigurations;
 import org.wso2.carbon.device.mgt.core.config.policy.PolicyConfiguration;
+import org.wso2.carbon.device.mgt.core.config.task.TaskConfiguration;
 
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
@@ -31,33 +32,14 @@ import javax.xml.bind.annotation.XmlRootElement;
 public class DeviceManagementConfigRepository {
 
 	private DataSourceConfig dataSourceConfig;
-	private IdentityConfigurations identityConfigurations;
-	private PolicyConfiguration policyConfiguration;
 
-	@XmlElement(name = "DataSourceConfiguration", required = true)
-	public DataSourceConfig getDataSourceConfig() {
-		return dataSourceConfig;
-	}
+    @XmlElement(name = "DataSourceConfiguration", required = true)
+    public DataSourceConfig getDataSourceConfig() {
+        return dataSourceConfig;
+    }
 
-	public void setDataSourceConfig(DataSourceConfig dataSourceConfig) {
-		this.dataSourceConfig = dataSourceConfig;
-	}
+    public void setDataSourceConfig(DataSourceConfig dataSourceConfig) {
+        this.dataSourceConfig = dataSourceConfig;
+    }
 
-	@XmlElement(name = "IdentityConfiguration", required = true)
-	public IdentityConfigurations getIdentityConfigurations() {
-		return identityConfigurations;
-	}
-
-	public void setIdentityConfigurations(IdentityConfigurations identityConfigurations) {
-		this.identityConfigurations = identityConfigurations;
-	}
-
-	@XmlElement(name = "PolicyConfiguration", required = true)
-	public PolicyConfiguration getPolicyConfiguration() {
-		return policyConfiguration;
-	}
-
-	public void setPolicyConfiguration(PolicyConfiguration policyConfiguration) {
-		this.policyConfiguration = policyConfiguration;
-	}
 }

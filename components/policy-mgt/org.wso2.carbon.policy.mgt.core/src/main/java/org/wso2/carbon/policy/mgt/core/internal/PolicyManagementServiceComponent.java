@@ -87,10 +87,8 @@ public class PolicyManagementServiceComponent {
             componentContext.getBundleContext().registerService(
                     PolicyManagerService.class.getName(), new PolicyManagerServiceImpl(), null);
 
-
-
-            PolicyConfiguration policyConfiguration = DeviceConfigurationManager.getInstance().getDeviceManagementConfig().
-                    getDeviceManagementConfigRepository().getPolicyConfiguration();
+            PolicyConfiguration policyConfiguration =
+                    DeviceConfigurationManager.getInstance().getDeviceManagementConfig().getPolicyConfiguration();
             if(policyConfiguration.getMonitoringEnable()) {
                 TaskScheduleService taskScheduleService = new TaskScheduleServiceImpl();
                 taskScheduleService.startTask(PolicyManagerUtil.getMonitoringFequency());
@@ -98,6 +96,20 @@ public class PolicyManagementServiceComponent {
 
         } catch (Throwable t) {
             log.error("Error occurred while initializing the Policy management core.", t);
+        }
+    }
+
+    @SuppressWarnings("unused")
+    protected void deactivate(ComponentContext componentContext) {
+        try {
+            PolicyConfiguration policyConfiguration =
+                    DeviceConfigurationManager.getInstance().getDeviceManagementConfig().getPolicyConfiguration();
+            if (policyConfiguration.getMonitoringEnable()) {
+                TaskScheduleService taskScheduleService = new TaskScheduleServiceImpl();
+                taskScheduleService.stopTask();
+            }
+        } catch (Throwable t) {
+            log.error("Error occurred while destroying the Policy management core.", t);
         }
     }
 

@@ -18,6 +18,7 @@
 
 package org.wso2.carbon.certificate.mgt.core.dao;
 
+import org.wso2.carbon.certificate.mgt.core.dto.CertificateResponse;
 import org.wso2.carbon.device.mgt.common.PaginationRequest;
 import org.wso2.carbon.device.mgt.common.PaginationResult;
 
@@ -59,9 +60,18 @@ public interface CertificateDAO {
     PaginationResult getAllCertificates(PaginationRequest request) throws CertificateManagementDAOException;
 
     /**
+     * Get all the certificates.
+     * @return List of certificates
+     * @throws CertificateManagementDAOException
+     */
+    public List<CertificateResponse> getAllCertificates() throws CertificateManagementDAOException;
+
+    /**
      * Delete a certificate identified by a serial number()
      * @param serialNumber serial number
      * @return whether the certificate was removed or not.
      */
     boolean removeCertificate(String serialNumber) throws CertificateManagementDAOException;
+
+    public List<CertificateResponse> searchCertificate(String serialNumber) throws CertificateManagementDAOException;
 }

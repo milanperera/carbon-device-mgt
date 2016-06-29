@@ -24,12 +24,13 @@ import org.w3c.dom.Document;
 import org.wso2.carbon.device.mgt.common.Device;
 import org.wso2.carbon.device.mgt.common.configuration.mgt.ConfigurationEntry;
 import org.wso2.carbon.device.mgt.common.configuration.mgt.ConfigurationManagementException;
-import org.wso2.carbon.device.mgt.common.configuration.mgt.TenantConfiguration;
-import org.wso2.carbon.device.mgt.common.configuration.mgt.TenantConfigurationManagementService;
+import org.wso2.carbon.device.mgt.common.configuration.mgt.PlatformConfiguration;
+import org.wso2.carbon.device.mgt.common.configuration.mgt.PlatformConfigurationManagementService;
+import org.wso2.carbon.device.mgt.common.group.mgt.DeviceGroup;
 import org.wso2.carbon.device.mgt.common.operation.mgt.Operation;
 import org.wso2.carbon.device.mgt.core.config.DeviceConfigurationManager;
 import org.wso2.carbon.device.mgt.core.config.policy.PolicyConfiguration;
-import org.wso2.carbon.device.mgt.core.config.tenant.TenantConfigurationManagementServiceImpl;
+import org.wso2.carbon.device.mgt.core.config.tenant.PlatformConfigurationManagementServiceImpl;
 import org.wso2.carbon.device.mgt.core.operation.mgt.PolicyOperation;
 import org.wso2.carbon.device.mgt.core.operation.mgt.ProfileOperation;
 import org.wso2.carbon.policy.mgt.common.Policy;
@@ -195,10 +196,10 @@ public class PolicyManagerUtil {
     }
 
 
-    public static int getMonitoringFequency() {
+    public static int getMonitoringFequency() throws PolicyManagementException {
 
-        TenantConfigurationManagementService configMgtService = new TenantConfigurationManagementServiceImpl();
-        TenantConfiguration tenantConfiguration = null;
+        PlatformConfigurationManagementService configMgtService = new PlatformConfigurationManagementServiceImpl();
+        PlatformConfiguration tenantConfiguration;
         int monitoringFrequency = 0;
         try {
             tenantConfiguration = configMgtService.getConfiguration(GENERAL_CONFIG_RESOURCE_PATH);
@@ -207,7 +208,11 @@ public class PolicyManagerUtil {
             if (configuration != null && !configuration.isEmpty()) {
                 for (ConfigurationEntry cEntry : configuration) {
                     if (cEntry.getName().equalsIgnoreCase(MONITORING_FREQUENCY)) {
-                        monitoringFrequency = Integer.parseInt((String)cEntry.getValue());
+                        if (cEntry.getValue() == null) {
+                            throw new PolicyManagementException("Invalid value, i.e. '" + cEntry.getValue() +
+                                    "', is configured as the monitoring frequency");
+                        }
+                        monitoringFrequency = (int) (Double.parseDouble(cEntry.getValue().toString()) + 0.5d);
                     }
                 }
             }
@@ -218,10 +223,19 @@ public class PolicyManagerUtil {
 
         if (monitoringFrequency == 0) {
             PolicyConfiguration policyConfiguration = DeviceConfigurationManager.getInstance().
-                    getDeviceManagementConfig().getDeviceManagementConfigRepository().getPolicyConfiguration();
+                    getDeviceManagementConfig().getPolicyConfiguration();
             monitoringFrequency = policyConfiguration.getMonitoringFrequency();
         }
 
         return monitoringFrequency;
+    }
+
+
+    public static Map<Integer, DeviceGroup> convertDeviceGroupMap(List<DeviceGroup> deviceGroups) {
+        Map<Integer, DeviceGroup> groupMap = new HashMap<>();
+        for (DeviceGroup dg: deviceGroups){
+            groupMap.put(dg.getId(), dg);
+        }
+        return groupMap;
     }
 }

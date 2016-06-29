@@ -22,10 +22,12 @@ import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.owasp.encoder.Encode;
 import org.wso2.carbon.context.PrivilegedCarbonContext;
 import org.wso2.carbon.tomcat.ext.valves.CarbonTomcatValve;
 import org.wso2.carbon.tomcat.ext.valves.CompositeValve;
 import org.wso2.carbon.webapp.authenticator.framework.authenticator.WebappAuthenticator;
+import org.wso2.carbon.webapp.authenticator.framework.authorizer.WebappTenantAuthorizer;
 
 import javax.servlet.http.HttpServletResponse;
 import java.util.HashMap;
@@ -51,6 +53,11 @@ public class WebappAuthenticationValve extends CarbonTomcatValve {
             return;
         }
         AuthenticationInfo authenticationInfo = authenticator.authenticate(request, response);
+        if (isManagedAPI(request) && (authenticationInfo.getStatus() == WebappAuthenticator.Status.CONTINUE ||
+                authenticationInfo.getStatus() == WebappAuthenticator.Status.SUCCESS)) {
+            WebappAuthenticator.Status status = WebappTenantAuthorizer.authorize(request, authenticationInfo);
+            authenticationInfo.setStatus(status);
+        }
         if (authenticationInfo.getTenantId() != -1) {
             try {
                 PrivilegedCarbonContext.startTenantFlow();
@@ -75,6 +82,11 @@ public class WebappAuthenticationValve extends CarbonTomcatValve {
     private boolean skipAuthentication(Request request) {
         String param = request.getContext().findParameter("doAuthentication");
         return (param == null || !Boolean.parseBoolean(param) || isNonSecuredEndPoint(request));
+    }
+
+    private boolean isManagedAPI(Request request) {
+        String param = request.getContext().findParameter("managed-api-enabled");
+        return (param != null && Boolean.parseBoolean(param));
     }
 
     private boolean isContextSkipped(Request request) {
@@ -140,11 +152,10 @@ public class WebappAuthenticationValve extends CarbonTomcatValve {
                     response.setHeader("WWW-Authenticate", msg);
                 }
                 if (log.isDebugEnabled()) {
-                    log.debug(msg + " , API : " + request.getRequestURI());
+                    log.debug(msg + " , API : " + Encode.forUriComponent(request.getRequestURI()));
                 }
-                AuthenticationFrameworkUtil
-                        .handleResponse(request, response, HttpServletResponse.SC_UNAUTHORIZED,
-                                        msg);
+                AuthenticationFrameworkUtil.
+                        handleResponse(request, response, HttpServletResponse.SC_UNAUTHORIZED, msg);
                 break;
         }
     }

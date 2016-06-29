@@ -21,13 +21,13 @@
     <parent>
         <groupId>org.wso2.carbon.devicemgt</groupId>
         <artifactId>certificate-mgt</artifactId>
-        <version>1.0.4-SNAPSHOT</version>
+        <version>1.1.1-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
     <modelVersion>4.0.0</modelVersion>
     <artifactId>org.wso2.carbon.certificate.mgt.core</artifactId>
-    <version>1.0.4-SNAPSHOT</version>
+    <version>1.1.1-SNAPSHOT</version>
     <packaging>bundle</packaging>
     <name>WSO2 Carbon - Certificate Management Core</name>
     <description>WSO2 Carbon - Certificate Management Core</description>
@@ -68,8 +68,9 @@
                             org.bouncycastle.jce.provider,
                             org.bouncycastle.operator,
                             org.bouncycastle.operator.jcajce,
+                            org.bouncycastle.asn1.x500.style,
                             org.bouncycastle.pkcs,
-                            org.bouncycastle.openssl,
+                            <!--org.bouncycastle.openssl,-->
                             org.bouncycastle.util,
                             org.jscep.message,
                             org.wso2.carbon.context,
@@ -77,14 +78,15 @@
                             org.w3c.dom,
                             org.xml.sax,
                             javax.sql,
-                            javax.cache,
+                            <!--javax.cache,-->
                             javax.naming,
                             javax.xml.bind.annotation,
                             javax.xml.bind,
                             org.wso2.carbon.utils.*,
                             org.wso2.carbon.device.mgt.common.*,
+                            io.swagger.annotations.*;resolution:=optional,
                             org.wso2.carbon.device.mgt.core.*,
-                            org.bouncycastle.pkcs.jcajce
+                            <!--org.bouncycastle.pkcs.jcajce-->
                         </Import-Package>
                         <Export-Package>
                             !org.wso2.carbon.certificate.mgt.core.internal.*,
@@ -156,8 +158,6 @@
             <groupId>org.wso2.carbon</groupId>
             <artifactId>org.wso2.carbon.utils</artifactId>
         </dependency>
-
-
         <dependency>
             <groupId>org.wso2.carbon.devicemgt</groupId>
             <artifactId>org.wso2.carbon.device.mgt.core</artifactId>
@@ -165,6 +165,11 @@
         <dependency>
             <groupId>org.wso2.carbon.devicemgt</groupId>
             <artifactId>org.wso2.carbon.device.mgt.common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.swagger</groupId>
+            <artifactId>swagger-annotations</artifactId>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 

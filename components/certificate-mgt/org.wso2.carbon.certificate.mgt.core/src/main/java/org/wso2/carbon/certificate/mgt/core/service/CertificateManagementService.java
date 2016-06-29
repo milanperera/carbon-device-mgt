@@ -56,6 +56,8 @@ public interface CertificateManagementService {
 
     public CertificateResponse verifyPEMSignature(X509Certificate requestCertificate) throws KeystoreException;
 
+    public CertificateResponse verifySubjectDN(String requestDN) throws KeystoreException;
+
     public X509Certificate extractCertificateFromSignature(String headerSignature) throws KeystoreException;
 
     String extractChallengeToken(X509Certificate certificate);
@@ -74,4 +76,8 @@ public interface CertificateManagementService {
     public PaginationResult getAllCertificates(PaginationRequest request) throws CertificateManagementDAOException;
 
     boolean removeCertificate(String serialNumber) throws CertificateManagementDAOException;
+
+    public List<CertificateResponse> getCertificates() throws CertificateManagementDAOException;
+
+    public List<CertificateResponse> searchCertificates(String serialNumber) throws CertificateManagementDAOException;
 }

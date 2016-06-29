@@ -43,8 +43,8 @@ public class TaskScheduleServiceImpl implements TaskScheduleService {
 
 
     public TaskScheduleServiceImpl() {
-        this.policyConfiguration = DeviceConfigurationManager.getInstance().getDeviceManagementConfig().
-                getDeviceManagementConfigRepository().getPolicyConfiguration();
+        this.policyConfiguration =
+                DeviceConfigurationManager.getInstance().getDeviceManagementConfig().getPolicyConfiguration();
     }
 
     @Override
@@ -103,8 +103,10 @@ public class TaskScheduleServiceImpl implements TaskScheduleService {
         try {
             String taskName = PolicyManagementConstants.MONITORING_TASK_NAME + "_" + String.valueOf(tenantId);
             TaskService taskService = PolicyManagementDataHolder.getInstance().getTaskService();
-            TaskManager taskManager = taskService.getTaskManager(PolicyManagementConstants.MONITORING_TASK_TYPE);
-            taskManager.deleteTask(taskName);
+            if (taskService.isServerInit()) {
+                TaskManager taskManager = taskService.getTaskManager(PolicyManagementConstants.MONITORING_TASK_TYPE);
+                taskManager.deleteTask(taskName);
+            }
         } catch (TaskException e) {
             throw new PolicyMonitoringTaskException("Error occurred while deleting the task for tenant " +
                                                     tenantId, e);

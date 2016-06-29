@@ -21,6 +21,7 @@ package org.wso2.carbon.policy.mgt.core.mgt.impl;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.wso2.carbon.context.PrivilegedCarbonContext;
 import org.wso2.carbon.device.mgt.common.Device;
 import org.wso2.carbon.device.mgt.common.DeviceIdentifier;
 import org.wso2.carbon.device.mgt.common.DeviceManagementException;
@@ -71,14 +72,14 @@ public class MonitoringManagerImpl implements MonitoringManager {
         this.deviceTypeDAO = DeviceManagementDAOFactory.getDeviceTypeDAO();
         this.monitoringDAO = PolicyManagementDAOFactory.getMonitoringDAO();
         this.complianceDecisionPoint = new ComplianceDecisionPointImpl();
-        this.policyConfiguration = DeviceConfigurationManager.getInstance().getDeviceManagementConfig().
-                getDeviceManagementConfigRepository().getPolicyConfiguration();
-
+        this.policyConfiguration =
+                DeviceConfigurationManager.getInstance().getDeviceManagementConfig().getPolicyConfiguration();
     }
 
     @Override
-    public List<ComplianceFeature> checkPolicyCompliance(DeviceIdentifier deviceIdentifier,
-                                                         Object deviceResponse) throws PolicyComplianceException {
+    public List<ComplianceFeature> checkPolicyCompliance(
+            DeviceIdentifier deviceIdentifier,
+            Object deviceResponse) throws PolicyComplianceException {
 
         List<ComplianceFeature> complianceFeatures = new ArrayList<>();
         try {
@@ -375,7 +376,8 @@ public class MonitoringManagerImpl implements MonitoringManager {
         List<DeviceType> deviceTypes = new ArrayList<>();
         try {
             DeviceManagementDAOFactory.openConnection();
-            deviceTypes = deviceTypeDAO.getDeviceTypes();
+            int tenantId = PrivilegedCarbonContext.getThreadLocalCarbonContext().getTenantId();
+            deviceTypes = deviceTypeDAO.getDeviceTypes(tenantId);
         } catch (Exception e) {
             log.error("Error occurred while getting the device types.", e);
         } finally {
@@ -401,8 +403,13 @@ public class MonitoringManagerImpl implements MonitoringManager {
 //	    appListOperation.setType(Operation.Type.COMMAND);
 //	    appListOperation.setCode(OPERATION_APP_LIST);
 
+        //TODO: Fix this properly later adding device type to be passed in when the task manage executes "addOperations()"
+        String type = null;
+        if (deviceIdentifiers.size() > 0) {
+            type = deviceIdentifiers.get(0).getType();
+        }
         DeviceManagementProviderService service = new DeviceManagementProviderServiceImpl();
-        service.addOperation(monitoringOperation, deviceIdentifiers);
+        service.addOperation(type, monitoringOperation, deviceIdentifiers);
 //	    service.addOperation(infoOperation, deviceIdentifiers);
 //	    service.addOperation(appListOperation, deviceIdentifiers);
     }

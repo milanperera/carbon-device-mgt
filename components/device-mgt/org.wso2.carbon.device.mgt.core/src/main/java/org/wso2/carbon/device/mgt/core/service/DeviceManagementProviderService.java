@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
+ * Copyright (c) 2016, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
  *
  * WSO2 Inc. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
@@ -11,17 +11,18 @@
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
+ * KIND, either express or implied. See the License for the
  * specific language governing permissions and limitations
  * under the License.
  */
 package org.wso2.carbon.device.mgt.core.service;
 
 import org.wso2.carbon.device.mgt.common.*;
-import org.wso2.carbon.device.mgt.common.configuration.mgt.TenantConfiguration;
+import org.wso2.carbon.device.mgt.common.configuration.mgt.PlatformConfiguration;
 import org.wso2.carbon.device.mgt.common.license.mgt.License;
+import org.wso2.carbon.device.mgt.common.operation.mgt.Activity;
 import org.wso2.carbon.device.mgt.common.operation.mgt.Operation;
-import org.wso2.carbon.device.mgt.common.operation.mgt.OperationManager;
+import org.wso2.carbon.device.mgt.common.operation.mgt.OperationManagementException;
 import org.wso2.carbon.device.mgt.core.dto.DeviceType;
 
 import java.util.List;
@@ -30,7 +31,7 @@ import java.util.List;
  * Proxy class for all Device Management related operations that take the corresponding plugin type in
  * and resolve the appropriate plugin implementation
  */
-public interface DeviceManagementProviderService extends OperationManager {
+public interface DeviceManagementProviderService {
 
     List<Device> getAllDevices(String deviceType) throws DeviceManagementException;
 
@@ -70,7 +71,7 @@ public interface DeviceManagementProviderService extends OperationManager {
      * @throws DeviceManagementException If some unusual behaviour is observed while fetching the
      *                                   configuration.
      */
-    TenantConfiguration getConfiguration(String deviceType) throws DeviceManagementException;
+    PlatformConfiguration getConfiguration(String deviceType) throws DeviceManagementException;
 
     /**
      * Method to get the list of devices owned by an user with paging information.
@@ -113,6 +114,15 @@ public interface DeviceManagementProviderService extends OperationManager {
     List<Device> getAllDevicesOfRole(String roleName) throws DeviceManagementException;
 
     /**
+     * Method to get the device count of user.
+     *
+     * @return device count
+     * @throws DeviceManagementException If some unusual behaviour is observed while counting
+     *                                   the devices
+     */
+    int getDeviceCount(String username) throws DeviceManagementException;
+
+    /**
      * Method to get the count of all types of devices.
      *
      * @return device count
@@ -129,7 +139,7 @@ public interface DeviceManagementProviderService extends OperationManager {
      * @throws DeviceManagementException If some unusual behaviour is observed while fetching the
      *                                   device list
      */
-    List<Device> getDevicesByName(String deviceName) throws DeviceManagementException;
+    List<Device> getDevicesByNameAndType(String deviceName, String type, int offset, int limit) throws DeviceManagementException;
 
     /**
      * This method is used to retrieve list of devices that matches with the given device name with paging information.
@@ -162,6 +172,17 @@ public interface DeviceManagementProviderService extends OperationManager {
      */
     PaginationResult getDevicesByStatus(PaginationRequest request) throws DeviceManagementException;
 
+    /**
+     * This method is used to check whether the device is enrolled with the give user.
+     *
+     * @param deviceId identifier of the device that needs to be checked against the user.
+     * @param user username of the device owner.
+     *
+     * @return true if the user owns the device else will return false.
+     * @throws DeviceManagementException If some unusual behaviour is observed while fetching the device.
+     */
+    public boolean isEnrolled(DeviceIdentifier deviceId, String user) throws DeviceManagementException;
+
     License getLicense(String deviceType, String languageCode) throws DeviceManagementException;
 
     void addLicense(String deviceType, License license) throws DeviceManagementException;
@@ -170,9 +191,9 @@ public interface DeviceManagementProviderService extends OperationManager {
 
     boolean enrollDevice(Device device) throws DeviceManagementException;
 
-    TenantConfiguration getConfiguration() throws DeviceManagementException;
+    PlatformConfiguration getConfiguration() throws DeviceManagementException;
 
-    boolean saveConfiguration(TenantConfiguration configuration) throws DeviceManagementException;
+    boolean saveConfiguration(PlatformConfiguration configuration) throws DeviceManagementException;
 
     boolean disenrollDevice(DeviceIdentifier deviceId) throws DeviceManagementException;
 
@@ -197,6 +218,41 @@ public interface DeviceManagementProviderService extends OperationManager {
     boolean setStatus(DeviceIdentifier deviceId, String currentOwner,
                       EnrolmentInfo.Status status) throws DeviceManagementException;
 
-    void notifyOperationToDevices(Operation operation, List<DeviceIdentifier> deviceIds) throws DeviceManagementException;
+    void notifyOperationToDevices(Operation operation,
+                                  List<DeviceIdentifier> deviceIds) throws DeviceManagementException;
+
+    Activity addOperation(String type, Operation operation,
+                          List<DeviceIdentifier> devices) throws OperationManagementException;
+
+    List<? extends Operation> getOperations(DeviceIdentifier deviceId) throws OperationManagementException;
+
+    PaginationResult getOperations(DeviceIdentifier deviceId,
+                                   PaginationRequest request) throws OperationManagementException;
+
+    List<? extends Operation> getPendingOperations(
+            DeviceIdentifier deviceId) throws OperationManagementException;
+
+    Operation getNextPendingOperation(DeviceIdentifier deviceId) throws OperationManagementException;
+
+    void updateOperation(DeviceIdentifier deviceId, Operation operation) throws OperationManagementException;
+
+    void deleteOperation(String type, int operationId) throws OperationManagementException;
+
+    Operation getOperationByDeviceAndOperationId(DeviceIdentifier deviceId, int operationId)
+            throws OperationManagementException;
+
+    List<? extends Operation> getOperationsByDeviceAndStatus(DeviceIdentifier identifier,
+                                                             Operation.Status status)
+            throws OperationManagementException, DeviceManagementException;
+
+    Operation getOperation(String type, int operationId) throws OperationManagementException;
+
+    Activity getOperationByActivityId(String activity) throws OperationManagementException;
+
+    List<Activity> getActivitiesUpdatedAfter(long timestamp) throws OperationManagementException;
+
+    List<Activity> getActivitiesUpdatedAfter(long timestamp, int limit, int offset) throws OperationManagementException;
+
+    int getActivityCountUpdatedAfter(long timestamp) throws OperationManagementException;
 
 }

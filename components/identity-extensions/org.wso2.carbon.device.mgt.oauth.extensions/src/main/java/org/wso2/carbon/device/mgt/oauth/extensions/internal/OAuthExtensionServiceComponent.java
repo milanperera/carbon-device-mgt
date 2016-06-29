@@ -21,9 +21,18 @@ package org.wso2.carbon.device.mgt.oauth.extensions.internal;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.osgi.service.component.ComponentContext;
+import org.wso2.carbon.apimgt.api.APIManagementException;
+import org.wso2.carbon.apimgt.impl.APIConstants;
+import org.wso2.carbon.apimgt.impl.APIManagerConfiguration;
 import org.wso2.carbon.device.mgt.common.permission.mgt.PermissionManagerService;
+import org.wso2.carbon.device.mgt.core.service.DeviceManagementProviderService;
 import org.wso2.carbon.identity.oauth2.OAuth2TokenValidationService;
 import org.wso2.carbon.user.core.service.RealmService;
+import org.wso2.carbon.utils.CarbonUtils;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @scr.component name="org.wso2.carbon.device.mgt.oauth.extensions" immediate="true"
@@ -45,21 +54,72 @@ import org.wso2.carbon.user.core.service.RealmService;
  * policy="dynamic"
  * bind="setPermissionManagerService"
  * unbind="unsetPermissionManagerService"
+ * @scr.reference name="org.wso2.carbon.device.manager"
+ * interface="org.wso2.carbon.device.mgt.core.service.DeviceManagementProviderService"
+ * cardinality="1..1"
+ * policy="dynamic"
+ * bind="setDeviceManagementService"
+ * unbind="unsetDeviceManagementService"
  */
 public class OAuthExtensionServiceComponent {
 
     private static final Log log = LogFactory.getLog(OAuthExtensionServiceComponent.class);
+    private static final String REPOSITORY = "repository";
+    private static final String CONFIGURATION = "conf";
+    private static final String APIM_CONF_FILE = "api-manager.xml";
+    private static final String API_KEY_MANGER_DEVICE_SCOPE = "APIKeyValidator.DeviceScope";
+    private static final String CDMF_DEVICE_SCOPE_PREFIX = "cdmf_";
+
 
     @SuppressWarnings("unused")
     protected void activate(ComponentContext componentContext) {
-        if(log.isDebugEnabled()){
+        if (log.isDebugEnabled()) {
             log.debug("Starting OAuthExtensionBundle");
+        }
+        try {
+            APIManagerConfiguration configuration = new APIManagerConfiguration();
+            String filePath = new StringBuilder().
+                    append(CarbonUtils.getCarbonHome()).
+                    append(File.separator).
+                    append(REPOSITORY).
+                    append(File.separator).
+                    append(CONFIGURATION).
+                    append(File.separator).
+                    append(APIM_CONF_FILE).toString();
+
+            configuration.load(filePath);
+            // loading white listed scopes
+            List<String> whiteList;
+
+            // Read scope whitelist from Configuration.
+            whiteList = configuration.getProperty(APIConstants.API_KEY_MANGER_SCOPE_WHITELIST);
+
+            // If whitelist is null, default scopes will be put.
+            if (whiteList == null) {
+                whiteList = new ArrayList<String>();
+                whiteList.add(APIConstants.OPEN_ID_SCOPE_NAME);
+                whiteList.add(APIConstants.DEVICE_SCOPE_PATTERN);
+            }
+
+            OAuthExtensionsDataHolder.getInstance().setWhitelistedScopes(whiteList);
+
+            // Read device scope(Specific to CDMF) from Configuration.
+            String deviceScope = configuration.getFirstProperty(API_KEY_MANGER_DEVICE_SCOPE);
+
+            if (deviceScope == null) {
+                deviceScope = CDMF_DEVICE_SCOPE_PREFIX;
+            }
+
+            OAuthExtensionsDataHolder.getInstance().setDeviceScope(deviceScope);
+
+        } catch (APIManagementException e) {
+            log.error("Error occurred while loading APIM configurations", e);
         }
     }
 
     @SuppressWarnings("unused")
     protected void deactivate(ComponentContext componentContext) {
-        if(log.isDebugEnabled()){
+        if (log.isDebugEnabled()) {
             log.debug("Stopping OAuthExtensionBundle");
         }
     }
@@ -134,6 +194,28 @@ public class OAuthExtensionServiceComponent {
             log.debug("Unsetting PermissionManager Service");
         }
         OAuthExtensionsDataHolder.getInstance().setPermissionManagerService(null);
+    }
+
+    /**
+     *  Set DeviceManagementProviderService
+     * @param deviceManagerService  An instance of PermissionManagerService
+     */
+    protected void setDeviceManagementService(DeviceManagementProviderService deviceManagerService) {
+        if (log.isDebugEnabled()) {
+            log.debug("Setting Device Management Service");
+        }
+        OAuthExtensionsDataHolder.getInstance().setDeviceManagementService(deviceManagerService);
+    }
+
+    /**
+     * unset DeviceManagementProviderService
+     * @param deviceManagementService  An instance of PermissionManagerService
+     */
+    protected void unsetDeviceManagementService(DeviceManagementProviderService deviceManagementService) {
+        if (log.isDebugEnabled()) {
+            log.debug("Removing Device Management Service");
+        }
+        OAuthExtensionsDataHolder.getInstance().setDeviceManagementService(null);
     }
 
 }
