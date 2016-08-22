@@ -89,32 +89,4 @@ public class WebappPublisherUtil {
         return realm;
     }
 
-    public static void addScope(String scopeKey) throws ScopeManagementException {
-        List<Scope> scopes = new ArrayList<>();
-        String adminRole = null;
-        Scope scope = new Scope();
-        scope.setKey(scopeKey);
-
-        try {
-            UserRealm userRealm = getUserRealm();
-            if (userRealm != null) {
-                adminRole = userRealm.getRealmConfiguration().getAdminRoleName();
-            }
-        } catch (UserStoreException e) {
-            // not throwing the exception forward because this scope can exist without a role
-            log.error("Cannot add default admin role to '" + scopeKey + "' scope");
-        }
-
-        if (adminRole != null && !adminRole.isEmpty()) {
-            scope.setRoles(adminRole);
-        }
-        scopes.add(scope);
-        ScopeManagementService scopeManagementService = getScopeManagementService();
-        if (scopeManagementService != null) {
-            if (!scopeManagementService.isScopeExist(scopeKey)) {
-                scopeManagementService.addScopes(scopes);
-            }
-        }
-    }
-
 }

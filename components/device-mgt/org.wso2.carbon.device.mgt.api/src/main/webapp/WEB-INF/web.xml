@@ -78,10 +78,6 @@
         <param-name>isSharedWithAllTenants</param-name>
         <param-value>true</param-value>
     </context-param>
-    <context-param>
-        <param-name>device-mgt-admin-scope</param-name>
-        <param-value>device-mgt:device:administrator</param-value>
-    </context-param>
 
     <!-- Below configuration is used to redirect http requests to https -->
     <security-constraint>

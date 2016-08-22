@@ -245,6 +245,7 @@ public class DeviceManagementServiceComponent {
 
         /* Registering Scope Management Service */
         ScopeManagementService scopeManagementService = new ScopeManagementServiceImpl();
+        DeviceManagementDataHolder.getInstance().setScopeManagementService(scopeManagementService);
         bundleContext.registerService(ScopeManagementService.class.getName(), scopeManagementService, null);
 
         /* Registering DeviceAccessAuthorization Service */

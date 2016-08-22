@@ -55,21 +55,6 @@ public interface DeviceAccessAuthorizationService {
      * This method will check whether the currently logged-in user has the access to the devices identified by the given
      * DeviceIdentifier list.
      *
-     * @param deviceIdentifiers List of DeviceIdentifiers to be checked for authorization.
-     * @param username Username of the user to be checked for authorization.
-     * @param groupPermissions Group Permissions
-     * @param context ServletContext
-     * @return
-     * @throws DeviceAccessAuthorizationException if something goes wrong when checking the authorization.
-     */
-    DeviceAuthorizationResult isUserAuthorized(List<DeviceIdentifier> deviceIdentifiers, String username,
-                                               String[] groupPermissions, ServletContext context)
-            throws DeviceAccessAuthorizationException;
-
-    /**
-     * This method will check whether the currently logged-in user has the access to the devices identified by the given
-     * DeviceIdentifier list.
-     *
      * @param deviceIdentifiers - List of DeviceIdentifiers to be checked for authorization.
      * @return DeviceAuthorizationResult - Authorization result including the list of authorized devices & unauthorized
      * devices.
@@ -145,11 +130,11 @@ public interface DeviceAccessAuthorizationService {
             DeviceAccessAuthorizationException;
 
     /**
+     * This method is used to check whether the user who initiates the request is device management admin.
      *
-     * @param context
-     * @return
+     * @return returns true if its admin
      * @throws DeviceAccessAuthorizationException
      */
-    DeviceAuthorizationResult isUserAuthorized(ServletContext context) throws DeviceAccessAuthorizationException;
+    boolean isDeviceAdmin() throws DeviceAccessAuthorizationException;
 
 }

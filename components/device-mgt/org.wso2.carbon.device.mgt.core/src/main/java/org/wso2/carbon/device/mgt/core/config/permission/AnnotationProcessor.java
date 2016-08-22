@@ -21,7 +21,6 @@ package org.wso2.carbon.device.mgt.core.config.permission;
 import org.apache.catalina.core.StandardContext;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.scannotation.AnnotationDB;
 import org.wso2.carbon.apimgt.annotations.api.API;
 
 import javax.servlet.ServletContext;

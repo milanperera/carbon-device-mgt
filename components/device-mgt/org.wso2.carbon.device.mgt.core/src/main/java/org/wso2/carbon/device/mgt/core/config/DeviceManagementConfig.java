@@ -40,6 +40,7 @@ public final class DeviceManagementConfig {
     private PolicyConfiguration policyConfiguration;
     private PaginationConfiguration paginationConfiguration;
     private List<String> pushNotificationProviders;
+    private String deviceManagementAdminScope;
 
 
     @XmlElement(name = "ManagementRepository", required = true)
@@ -98,5 +99,13 @@ public final class DeviceManagementConfig {
         this.paginationConfiguration = paginationConfiguration;
     }
 
+    @XmlElement(name = "DeviceManagementAdminScope", required = true)
+    public String getDeviceManagementAdminScope() {
+        return deviceManagementAdminScope;
+    }
+
+    public void setDeviceManagementAdminScope(String deviceManagementAdminScope) {
+        this.deviceManagementAdminScope = deviceManagementAdminScope;
+    }
 }
 

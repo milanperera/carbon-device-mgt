@@ -143,7 +143,6 @@ public class OAuthAuthenticator implements WebappAuthenticator {
                     authenticationInfo.setUsername(username);
                     authenticationInfo.setTenantDomain(tenantDomain);
                     authenticationInfo.setTenantId(Utils.getTenantIdOFUser(username + "@" + tenantDomain));
-                    authenticationInfo.setScopes(oAuthValidationResponse.getScopes());
                     if (oAuthValidationResponse.isValid())
                         authenticationInfo.setStatus(WebappAuthenticator.Status.CONTINUE);
                 } else {

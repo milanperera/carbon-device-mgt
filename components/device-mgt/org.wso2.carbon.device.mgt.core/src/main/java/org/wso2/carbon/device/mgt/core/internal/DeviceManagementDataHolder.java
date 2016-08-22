@@ -23,7 +23,9 @@ import org.wso2.carbon.device.mgt.common.app.mgt.ApplicationManager;
 import org.wso2.carbon.device.mgt.common.authorization.DeviceAccessAuthorizationService;
 import org.wso2.carbon.device.mgt.common.license.mgt.LicenseManager;
 import org.wso2.carbon.device.mgt.common.operation.mgt.OperationManager;
+import org.wso2.carbon.device.mgt.common.scope.mgt.ScopeManagementService;
 import org.wso2.carbon.device.mgt.core.app.mgt.config.AppManagementConfig;
+import org.wso2.carbon.device.mgt.core.config.DeviceManagementConfig;
 import org.wso2.carbon.device.mgt.core.config.license.LicenseConfig;
 import org.wso2.carbon.device.mgt.core.push.notification.mgt.PushNotificationProviderRepository;
 import org.wso2.carbon.device.mgt.core.service.DeviceManagementProviderService;
@@ -56,6 +58,7 @@ public class DeviceManagementDataHolder {
     private TaskService taskService;
     private EmailSenderService emailSenderService;
     private PushNotificationProviderRepository pushNotificationProviderRepository;
+    private ScopeManagementService scopeManagementService;
 
     public APIManagerConfiguration getApiManagerConfiguration() {
         return apiManagerConfiguration;
@@ -216,6 +219,14 @@ public class DeviceManagementDataHolder {
 
     public PushNotificationProviderRepository getPushNotificationProviderRepository() {
         return pushNotificationProviderRepository;
+    }
+
+    public ScopeManagementService getScopeManagementService() {
+        return scopeManagementService;
+    }
+
+    public void setScopeManagementService(ScopeManagementService scopeManagementService) {
+        this.scopeManagementService = scopeManagementService;
     }
 
 }

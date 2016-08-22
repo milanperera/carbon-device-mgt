@@ -27,7 +27,6 @@ public class OAuthValidationResponse {
     private String tenantDomain;
     private boolean isValid;
     private String errorMsg;
-    private String scopes[];
 
     public OAuthValidationResponse() {}
 
@@ -67,13 +66,5 @@ public class OAuthValidationResponse {
 
     public void setErrorMsg(String errorMsg) {
         this.errorMsg = errorMsg;
-    }
-
-    public String[] getScopes() {
-        return scopes;
-    }
-
-    public void setScopes(String scopes[]) {
-        this.scopes = scopes;
     }
 }

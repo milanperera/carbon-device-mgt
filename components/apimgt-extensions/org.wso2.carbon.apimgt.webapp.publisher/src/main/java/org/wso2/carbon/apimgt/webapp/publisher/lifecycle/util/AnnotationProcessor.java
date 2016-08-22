@@ -19,7 +19,6 @@
 package org.wso2.carbon.apimgt.webapp.publisher.lifecycle.util;
 
 import org.apache.catalina.core.StandardContext;
-import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.apimgt.annotations.api.API;

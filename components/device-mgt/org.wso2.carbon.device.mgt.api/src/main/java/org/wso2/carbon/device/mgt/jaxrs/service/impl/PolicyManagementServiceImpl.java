@@ -18,6 +18,7 @@
  */
 package org.wso2.carbon.device.mgt.jaxrs.service.impl;
 
+import com.sun.xml.bind.v2.TODO;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.context.PrivilegedCarbonContext;
@@ -68,26 +69,27 @@ public class PolicyManagementServiceImpl implements PolicyManagementService {
             Policy policy = this.getPolicyFromWrapper(policyWrapper);
 
             List<Device> devices = policy.getDevices();
-            if (devices != null && devices.size() == 1) {
-                DeviceAccessAuthorizationService deviceAccessAuthorizationService =
-                        DeviceManagementDataHolder.getInstance().getDeviceAccessAuthorizationService();
-                DeviceIdentifier deviceIdentifier = new DeviceIdentifier(devices.get(0).getDeviceIdentifier(),
-                        devices.get(0).getType());
-                PrivilegedCarbonContext threadLocalCarbonContext = PrivilegedCarbonContext.getThreadLocalCarbonContext();
-                String username = threadLocalCarbonContext.getUsername();
-                try {
-                    if (!deviceAccessAuthorizationService.isUserAuthorized(deviceIdentifier, username)) {
-                        return Response.status(Response.Status.UNAUTHORIZED).entity(
-                                new ErrorResponse.ErrorResponseBuilder().setMessage
-                                        ("Current logged in user is not authorized to add policies").build()).build();
-                    }
-                } catch (DeviceAccessAuthorizationException e) {
-                    String msg = "Error occurred while checking if the current user is authorized to add a policy";
-                    log.error(msg, e);
-                    return Response.serverError().entity(
-                            new ErrorResponse.ErrorResponseBuilder().setMessage(msg).build()).build();
-                }
-            }
+            // TODO: We dont support adding policies to an individual device. Hence it is commented temporally.
+//            if (devices != null && devices.size() == 1) {
+//                DeviceAccessAuthorizationService deviceAccessAuthorizationService =
+//                        DeviceManagementDataHolder.getInstance().getDeviceAccessAuthorizationService();
+//                DeviceIdentifier deviceIdentifier = new DeviceIdentifier(devices.get(0).getDeviceIdentifier(),
+//                        devices.get(0).getType());
+//                PrivilegedCarbonContext threadLocalCarbonContext = PrivilegedCarbonContext.getThreadLocalCarbonContext();
+//                String username = threadLocalCarbonContext.getUsername();
+//                try {
+//                    if (!deviceAccessAuthorizationService.isUserAuthorized(deviceIdentifier, username)) {
+//                        return Response.status(Response.Status.UNAUTHORIZED).entity(
+//                                new ErrorResponse.ErrorResponseBuilder().setMessage
+//                                        ("Current logged in user is not authorized to add policies").build()).build();
+//                    }
+//                } catch (DeviceAccessAuthorizationException e) {
+//                    String msg = "Error occurred while checking if the current user is authorized to add a policy";
+//                    log.error(msg, e);
+//                    return Response.serverError().entity(
+//                            new ErrorResponse.ErrorResponseBuilder().setMessage(msg).build()).build();
+//                }
+//            }
 
             PolicyAdministratorPoint pap = policyManagementService.getPAP();
             Policy createdPolicy = pap.addPolicy(policy);

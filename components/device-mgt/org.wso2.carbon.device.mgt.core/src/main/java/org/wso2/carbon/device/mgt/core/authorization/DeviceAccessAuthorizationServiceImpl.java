@@ -20,7 +20,9 @@ package org.wso2.carbon.device.mgt.core.authorization;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.wso2.carbon.apimgt.api.model.Scope;
 import org.wso2.carbon.context.CarbonContext;
+import org.wso2.carbon.context.PrivilegedCarbonContext;
 import org.wso2.carbon.device.mgt.common.Device;
 import org.wso2.carbon.device.mgt.common.DeviceIdentifier;
 import org.wso2.carbon.device.mgt.common.DeviceManagementException;
@@ -32,32 +34,35 @@ import org.wso2.carbon.device.mgt.common.group.mgt.DeviceGroup;
 import org.wso2.carbon.device.mgt.common.group.mgt.GroupManagementException;
 import org.wso2.carbon.device.mgt.common.permission.mgt.Permission;
 import org.wso2.carbon.device.mgt.common.permission.mgt.PermissionManagementException;
+import org.wso2.carbon.device.mgt.common.scope.mgt.ScopeManagementException;
+import org.wso2.carbon.device.mgt.common.scope.mgt.ScopeManagementService;
+import org.wso2.carbon.device.mgt.core.config.DeviceConfigurationManager;
+import org.wso2.carbon.device.mgt.core.config.DeviceManagementConfig;
 import org.wso2.carbon.device.mgt.core.internal.DeviceManagementDataHolder;
 import org.wso2.carbon.device.mgt.core.permission.mgt.PermissionUtils;
 import org.wso2.carbon.user.api.UserRealm;
 import org.wso2.carbon.user.api.UserStoreException;
+import org.wso2.carbon.user.api.UserStoreManager;
+import org.wso2.carbon.user.core.service.RealmService;
 
 import javax.servlet.ServletContext;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Implementation of DeviceAccessAuthorization service.
  */
 public class DeviceAccessAuthorizationServiceImpl implements DeviceAccessAuthorizationService {
 
-    private final static String CDM_ADMIN_PERMISSION = "/device-mgt/admin";
-    public static final String RESOURCE_SCOPES = "scopes";
-    public static final String DEVICE_MGT_ADMIN_SCOPE = "device-mgt-admin-scope";
     private static Log log = LogFactory.getLog(DeviceAccessAuthorizationServiceImpl.class);
+    private static String deviceMgtAdminScope;
 
     public DeviceAccessAuthorizationServiceImpl() {
+        deviceMgtAdminScope = DeviceConfigurationManager.getInstance().
+                getDeviceManagementConfig().getDeviceManagementAdminScope();
         try {
-            this.addAdminPermissionToRegistry();
-        } catch (PermissionManagementException e) {
-            log.error("Unable to add the emm-admin permission to the registry.", e);
+            this.addDeviceManagementAdminScope();
+        } catch (UserStoreException | ScopeManagementException e) {
+            log.error("Unable to add '" + deviceMgtAdminScope + "' scope to the DB.", e);
         }
     }
 
@@ -69,7 +74,7 @@ public class DeviceAccessAuthorizationServiceImpl implements DeviceAccessAuthori
             return !DeviceManagementDataHolder.getInstance().requireDeviceAuthorization(deviceIdentifier.getType());
         }
         //check for admin and ownership permissions
-        if (isAdminOrDeviceOwner(username, deviceIdentifier, null)) {
+        if (isAdminOrDeviceOwner(username, deviceIdentifier)) {
             return true;
         }
         //check for group permissions
@@ -92,6 +97,15 @@ public class DeviceAccessAuthorizationServiceImpl implements DeviceAccessAuthori
     }
 
     @Override
+    public boolean isDeviceAdmin() throws DeviceAccessAuthorizationException {
+        try {
+            return this.isAdminUser();
+        } catch (UserStoreException | ScopeManagementException e) {
+            throw new DeviceAccessAuthorizationException("Error occurred while checking device management admin", e);
+        }
+    }
+
+    @Override
     public boolean isUserAuthorized(DeviceIdentifier deviceIdentifier, String username)
             throws DeviceAccessAuthorizationException {
         return isUserAuthorized(deviceIdentifier, username, null);
@@ -110,48 +124,6 @@ public class DeviceAccessAuthorizationServiceImpl implements DeviceAccessAuthori
 
     @Override
     public DeviceAuthorizationResult isUserAuthorized(List<DeviceIdentifier> deviceIdentifiers, String username,
-                                                      String[] groupPermissions, ServletContext context)
-            throws DeviceAccessAuthorizationException {
-
-        if (username == null || username.isEmpty()) {
-            return null;
-        }
-        DeviceAuthorizationResult deviceAuthorizationResult = new DeviceAuthorizationResult();
-        for (DeviceIdentifier deviceIdentifier : deviceIdentifiers) {
-            //check for admin and ownership permissions
-            if (isAdminOrDeviceOwner(username, deviceIdentifier, context)) {
-                deviceAuthorizationResult.addAuthorizedDevice(deviceIdentifier);
-            } else {
-                try {
-                    if (groupPermissions == null || groupPermissions.length == 0) {
-                        return null;
-                    }
-                    //check for group permissions
-                    boolean isAuthorized = true;
-                    for (String groupPermission : groupPermissions) {
-                        if (!isAuthorizedViaGroup(username, deviceIdentifier, groupPermission)) {
-                            //if at least one failed, authorizations fails and break the loop
-                            isAuthorized = false;
-                            break;
-                        }
-                    }
-                    if (isAuthorized) {
-                        deviceAuthorizationResult.addAuthorizedDevice(deviceIdentifier);
-                    } else {
-                        deviceAuthorizationResult.addUnauthorizedDevice(deviceIdentifier);
-                    }
-                } catch (GroupManagementException | UserStoreException e) {
-                    throw new DeviceAccessAuthorizationException("Unable to authorize the access to device : " +
-                            deviceIdentifier.getId() + " for the user : " +
-                            username, e);
-                }
-            }
-        }
-        return deviceAuthorizationResult;
-    }
-
-    @Override
-    public DeviceAuthorizationResult isUserAuthorized(List<DeviceIdentifier> deviceIdentifiers, String username,
                                                       String[] groupPermissions)
             throws DeviceAccessAuthorizationException {
         int tenantId = this.getTenantId();
@@ -161,7 +133,7 @@ public class DeviceAccessAuthorizationServiceImpl implements DeviceAccessAuthori
         DeviceAuthorizationResult deviceAuthorizationResult = new DeviceAuthorizationResult();
         for (DeviceIdentifier deviceIdentifier : deviceIdentifiers) {
             //check for admin and ownership permissions
-            if (isAdminOrDeviceOwner(username, deviceIdentifier, null)) {
+            if (isAdminOrDeviceOwner(username, deviceIdentifier)) {
                 deviceAuthorizationResult.addAuthorizedDevice(deviceIdentifier);
             } else {
                 try {
@@ -210,31 +182,20 @@ public class DeviceAccessAuthorizationServiceImpl implements DeviceAccessAuthori
         return isUserAuthorized(deviceIdentifiers, this.getUserName(), groupPermissions);
     }
 
-    @Override
-    public DeviceAuthorizationResult isUserAuthorized(ServletContext context)
-            throws DeviceAccessAuthorizationException {
-        DeviceAuthorizationResult deviceAuthorizationResult = new DeviceAuthorizationResult();
-        try {
-            if (isAdminUser(context)) {
-                deviceAuthorizationResult.setDeviceAdmin(true);
-                deviceAuthorizationResult.setAuthorizedUser(getUserName());
-            }
-        } catch (UserStoreException e) {
-            throw new DeviceAccessAuthorizationException("Error occurred while authorizing user", e);
-        }
-        return deviceAuthorizationResult;
-    }
-
-    private boolean isAdminOrDeviceOwner(String username, DeviceIdentifier deviceIdentifier, ServletContext context)
+    private boolean isAdminOrDeviceOwner(String username, DeviceIdentifier deviceIdentifier)
             throws DeviceAccessAuthorizationException {
         try {
             //First Check for admin users. If the user is an admin user we authorize the access to that device.
             //Secondly Check for device ownership. If the user is the owner of the device we allow the access.
-            return (isAdminUser(context) || isDeviceOwner(deviceIdentifier, username));
+            return (isAdminUser() || isDeviceOwner(deviceIdentifier, username));
         } catch (UserStoreException e) {
             throw new DeviceAccessAuthorizationException("Unable to authorize the access to device : " +
                                                                  deviceIdentifier.getId() + " for the user : " +
                                                                  username, e);
+        } catch (ScopeManagementException e) {
+            throw new DeviceAccessAuthorizationException("Unable to authorize the access to device : " +
+                    deviceIdentifier.getId() + " for the user : " +
+                    username, e);
         }
     }
 
@@ -271,17 +232,17 @@ public class DeviceAccessAuthorizationServiceImpl implements DeviceAccessAuthori
         }
     }
 
-    private boolean isAdminUser(ServletContext context) throws UserStoreException {
-        String scopes[] = (String[]) context.getAttribute(RESOURCE_SCOPES);
-        String deviceMgtAdminScope = context.getInitParameter(DEVICE_MGT_ADMIN_SCOPE);
-        if (deviceMgtAdminScope == null || deviceMgtAdminScope.isEmpty()) {
-            log.error("Device management admin scope is not defined in the WEB.xml of '" +
-                    context.getContextPath() +"' webapp");
-            return false;
-        }
-        if (scopes != null) {
-            for (String scope : scopes) {
-                if (DEVICE_MGT_ADMIN_SCOPE.equals(scope)) {
+    private boolean isAdminUser() throws UserStoreException, ScopeManagementException {
+        String userName = this.getUserName();
+        UserStoreManager userStoreManager = this.getUserStoreManager();
+        ScopeManagementService scopeManagementService =
+                DeviceManagementDataHolder.getInstance().getScopeManagementService();
+        String roleListOfUser[] = userStoreManager.getRoleListOfUser(userName);
+        List<Scope> scopes = new ArrayList<>();
+        for (String role : roleListOfUser) {
+            scopes = scopeManagementService.getScopesOfRole(role);
+            for (Scope scope : scopes) {
+                if (deviceMgtAdminScope.equals(scope.getKey())) {
                     return true;
                 }
             }
@@ -309,8 +270,17 @@ public class DeviceAccessAuthorizationServiceImpl implements DeviceAccessAuthori
         return CarbonContext.getThreadLocalCarbonContext().getTenantId();
     }
 
-    private boolean addAdminPermissionToRegistry() throws PermissionManagementException {
-        return PermissionUtils.putPermission(PermissionUtils.getAbsolutePermissionPath(CDM_ADMIN_PERMISSION));
+    private void addDeviceManagementAdminScope() throws ScopeManagementException, UserStoreException {
+        ScopeManagementService scopeManagementService =
+                DeviceManagementDataHolder.getInstance().getScopeManagementService();
+        String adminRole = this.getUserRealm().getRealmConfiguration().getAdminRoleName();
+        Scope adminScope = new Scope();
+        adminScope.setKey(deviceMgtAdminScope);
+        adminScope.setRoles(adminRole);
+
+        List<Scope> scopes = new ArrayList<>();
+        scopes.add(adminScope);
+        scopeManagementService.addScopes(scopes);
     }
 
     private Map<String, String> getOwnershipOfDevices(List<Device> devices) {
@@ -329,15 +299,16 @@ public class DeviceAccessAuthorizationServiceImpl implements DeviceAccessAuthori
         return ownershipData;
     }
 
-    public static final class PermissionMethod {
-        public static final String READ = "read";
-        public static final String WRITE = "write";
-        public static final String DELETE = "delete";
-        public static final String ACTION = "action";
-        public static final String UI_EXECUTE = "ui.execute";
-
-        private PermissionMethod() {
-            throw new AssertionError();
-        }
+    private UserStoreManager getUserStoreManager() throws UserStoreException {
+        UserStoreManager userStoreManager = this.getUserRealm().getUserStoreManager();
+        return userStoreManager;
     }
+
+    private UserRealm getUserRealm() throws UserStoreException {
+        PrivilegedCarbonContext ctx = PrivilegedCarbonContext.getThreadLocalCarbonContext();
+        int tenantId = ctx.getTenantId();
+        RealmService realmService = DeviceManagementDataHolder.getInstance().getRealmService();
+        return realmService.getTenantUserRealm(tenantId);
+    }
+
 }

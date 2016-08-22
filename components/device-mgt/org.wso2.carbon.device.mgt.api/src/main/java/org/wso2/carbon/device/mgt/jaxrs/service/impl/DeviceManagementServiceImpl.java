@@ -26,7 +26,6 @@ import org.wso2.carbon.device.mgt.common.app.mgt.Application;
 import org.wso2.carbon.device.mgt.common.app.mgt.ApplicationManagementException;
 import org.wso2.carbon.device.mgt.common.authorization.DeviceAccessAuthorizationException;
 import org.wso2.carbon.device.mgt.common.authorization.DeviceAccessAuthorizationService;
-import org.wso2.carbon.device.mgt.common.authorization.DeviceAuthorizationResult;
 import org.wso2.carbon.device.mgt.common.operation.mgt.Operation;
 import org.wso2.carbon.device.mgt.common.operation.mgt.OperationManagementException;
 import org.wso2.carbon.device.mgt.common.search.SearchContext;
@@ -47,10 +46,8 @@ import org.wso2.carbon.policy.mgt.common.monitor.ComplianceData;
 import org.wso2.carbon.policy.mgt.common.monitor.PolicyComplianceException;
 import org.wso2.carbon.policy.mgt.core.PolicyManagerService;
 
-import javax.servlet.ServletContext;
 import javax.validation.constraints.Size;
 import javax.ws.rs.*;
-import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.text.ParseException;
@@ -64,9 +61,6 @@ import java.util.List;
 public class DeviceManagementServiceImpl implements DeviceManagementService {
 
     private static final Log log = LogFactory.getLog(DeviceManagementServiceImpl.class);
-
-    @Context
-    private ServletContext context;
 
     @GET
     @Override
@@ -102,26 +96,27 @@ public class DeviceManagementServiceImpl implements DeviceManagementService {
             if (type != null && !type.isEmpty()) {
                 request.setDeviceType(type);
             }
-            DeviceAuthorizationResult deviceAuthorizationResult =
-                    deviceAccessAuthorizationService.isUserAuthorized(context);
+            // this is the user who initiates the request
+            String authorizedUser = CarbonContext.getThreadLocalCarbonContext().getUsername();
+
             // check whether the user is device-mgt admin
-            if (deviceAuthorizationResult.isDeviceAdmin()) {
+            if (deviceAccessAuthorizationService.isDeviceAdmin()) {
                 if (user != null && !user.isEmpty()) {
                     request.setOwner(user);
                 }
             } else {
                 if (user != null && !user.isEmpty()) {
-                    if (user.equals(deviceAuthorizationResult.getAuthorizedUser())) {
+                    if (user.equals(authorizedUser)) {
                         request.setOwner(user);
                     } else {
-                        String msg = "User '" + deviceAuthorizationResult.getAuthorizedUser() + "' is not authorized to" +
+                        String msg = "User '" + authorizedUser + "' is not authorized to" +
                                 "retrieve devices of '" + user + "' user";
                         log.error(msg);
                         return Response.status(Response.Status.UNAUTHORIZED).entity(
                                 new ErrorResponse.ErrorResponseBuilder().setCode(401l).setMessage(msg).build()).build();
                     }
                 } else {
-                    request.setOwner(deviceAuthorizationResult.getAuthorizedUser());
+                    request.setOwner(authorizedUser);
                 }
             }
             if (ownership != null && !ownership.isEmpty()) {

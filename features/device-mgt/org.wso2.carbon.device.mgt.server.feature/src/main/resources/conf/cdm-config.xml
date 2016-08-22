@@ -69,5 +69,6 @@
         <ActivityListPageSize>20</ActivityListPageSize>
         <OperationListPageSize>20</OperationListPageSize>
     </PaginationConfiguration>
+    <DeviceManagementAdminScope>device-mgt:device:admin</DeviceManagementAdminScope>
 </DeviceMgtConfiguration>
 

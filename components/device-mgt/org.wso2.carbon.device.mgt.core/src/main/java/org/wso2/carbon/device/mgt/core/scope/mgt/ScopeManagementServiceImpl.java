@@ -189,7 +189,19 @@ public class ScopeManagementServiceImpl implements ScopeManagementService {
 
     @Override
     public boolean isScopeExist(String scopeKey) throws ScopeManagementException {
-        return false;
+        try {
+            ScopeManagementDAOFactory.openConnection();
+            return scopeManagementDAO.isScopeExist(scopeKey);
+        } catch (SQLException e) {
+            throw new ScopeManagementException("SQL error occurred while checking scope '" + scopeKey +
+                    "' from database.", e);
+        } catch (ScopeManagementDAOException e) {
+            throw new ScopeManagementException("Error occurred while checking scope  '" + scopeKey +
+                    "' from database.", e);
+        } finally {
+            ScopeManagementDAOFactory.closeConnection();
+        }
+
     }
 
 }
