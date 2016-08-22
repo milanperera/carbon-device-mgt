@@ -20,6 +20,8 @@ package org.wso2.carbon.device.mgt.jaxrs.service.impl.util;
 
 
 
+import javax.servlet.ServletContext;
+import javax.ws.rs.core.Context;
 import java.util.Collections;
 import java.util.List;
 
@@ -27,6 +29,9 @@ import java.util.List;
  * This is used instead of filtering from cache.
  */
 public class FilteringUtil {
+
+    @Context
+    private ServletContext context;
 
     /**
      * This is used to filter from the cached policies.
@@ -37,4 +42,5 @@ public class FilteringUtil {
         }
         return sourceList.subList(offset, Math.min(offset + limit, sourceList.size()));
     }
+
 }

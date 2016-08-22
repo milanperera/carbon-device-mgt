@@ -24,6 +24,9 @@ import org.wso2.carbon.context.CarbonContext;
 import org.wso2.carbon.device.mgt.common.*;
 import org.wso2.carbon.device.mgt.common.app.mgt.Application;
 import org.wso2.carbon.device.mgt.common.app.mgt.ApplicationManagementException;
+import org.wso2.carbon.device.mgt.common.authorization.DeviceAccessAuthorizationException;
+import org.wso2.carbon.device.mgt.common.authorization.DeviceAccessAuthorizationService;
+import org.wso2.carbon.device.mgt.common.authorization.DeviceAuthorizationResult;
 import org.wso2.carbon.device.mgt.common.operation.mgt.Operation;
 import org.wso2.carbon.device.mgt.common.operation.mgt.OperationManagementException;
 import org.wso2.carbon.device.mgt.common.search.SearchContext;
@@ -44,8 +47,10 @@ import org.wso2.carbon.policy.mgt.common.monitor.ComplianceData;
 import org.wso2.carbon.policy.mgt.common.monitor.PolicyComplianceException;
 import org.wso2.carbon.policy.mgt.core.PolicyManagerService;
 
+import javax.servlet.ServletContext;
 import javax.validation.constraints.Size;
 import javax.ws.rs.*;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.text.ParseException;
@@ -59,6 +64,9 @@ import java.util.List;
 public class DeviceManagementServiceImpl implements DeviceManagementService {
 
     private static final Log log = LogFactory.getLog(DeviceManagementServiceImpl.class);
+
+    @Context
+    private ServletContext context;
 
     @GET
     @Override
@@ -76,6 +84,14 @@ public class DeviceManagementServiceImpl implements DeviceManagementService {
 //            RequestValidationUtil.validateSelectionCriteria(type, user, roleName, ownership, status);
             RequestValidationUtil.validatePaginationParameters(offset, limit);
             DeviceManagementProviderService dms = DeviceMgtAPIUtils.getDeviceManagementService();
+            DeviceAccessAuthorizationService deviceAccessAuthorizationService =
+                    DeviceMgtAPIUtils.getDeviceAccessAuthorizationService();
+            if (deviceAccessAuthorizationService == null) {
+                return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(
+                        new ErrorResponse.ErrorResponseBuilder().setMessage("Device access authorization service is " +
+                                "failed").build()).build();
+            }
+
             PaginationRequest request = new PaginationRequest(offset, limit);
             PaginationResult result;
             DeviceList devices = new DeviceList();
@@ -86,8 +102,27 @@ public class DeviceManagementServiceImpl implements DeviceManagementService {
             if (type != null && !type.isEmpty()) {
                 request.setDeviceType(type);
             }
-            if (user != null && !user.isEmpty()) {
-                request.setOwner(user);
+            DeviceAuthorizationResult deviceAuthorizationResult =
+                    deviceAccessAuthorizationService.isUserAuthorized(context);
+            // check whether the user is device-mgt admin
+            if (deviceAuthorizationResult.isDeviceAdmin()) {
+                if (user != null && !user.isEmpty()) {
+                    request.setOwner(user);
+                }
+            } else {
+                if (user != null && !user.isEmpty()) {
+                    if (user.equals(deviceAuthorizationResult.getAuthorizedUser())) {
+                        request.setOwner(user);
+                    } else {
+                        String msg = "User '" + deviceAuthorizationResult.getAuthorizedUser() + "' is not authorized to" +
+                                "retrieve devices of '" + user + "' user";
+                        log.error(msg);
+                        return Response.status(Response.Status.UNAUTHORIZED).entity(
+                                new ErrorResponse.ErrorResponseBuilder().setCode(401l).setMessage(msg).build()).build();
+                    }
+                } else {
+                    request.setOwner(deviceAuthorizationResult.getAuthorizedUser());
+                }
             }
             if (ownership != null && !ownership.isEmpty()) {
                 RequestValidationUtil.validateOwnershipType(ownership);
@@ -146,35 +181,13 @@ public class DeviceManagementServiceImpl implements DeviceManagementService {
             log.error(msg, e);
             return Response.serverError().entity(
                     new ErrorResponse.ErrorResponseBuilder().setMessage(msg).build()).build();
-        }
-    }
-
-    @GET
-    @Path("/user-devices")
-    public Response getDeviceByUser(@QueryParam("offset") int offset,
-                                    @QueryParam("limit") int limit) {
-
-        RequestValidationUtil.validatePaginationParameters(offset, limit);
-        PaginationRequest request = new PaginationRequest(offset, limit);
-        PaginationResult result;
-        DeviceList devices = new DeviceList();
-
-        String currentUser = CarbonContext.getThreadLocalCarbonContext().getUsername();
-        request.setOwner(currentUser);
-
-        try {
-            result = DeviceMgtAPIUtils.getDeviceManagementService().getDevicesOfUser(request);
-            devices.setList((List<Device>) result.getData());
-            devices.setCount(result.getRecordsTotal());
-            return Response.status(Response.Status.OK).entity(devices).build();
-        } catch (DeviceManagementException e) {
-            String msg = "Error occurred while fetching all enrolled devices";
+        } catch (DeviceAccessAuthorizationException e) {
+            String msg = "Error occurred while checking device access authorization";
             log.error(msg, e);
             return Response.serverError().entity(
                     new ErrorResponse.ErrorResponseBuilder().setMessage(msg).build()).build();
         }
     }
-
 
     @GET
     @Path("/{type}/{id}")

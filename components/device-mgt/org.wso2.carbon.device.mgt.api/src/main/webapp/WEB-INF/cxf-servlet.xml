@@ -50,7 +50,7 @@
 
     <bean id="swaggerWriter" class="io.swagger.jaxrs.listing.SwaggerSerializers" />
     <bean id="swaggerResource" class="io.swagger.jaxrs.listing.ApiListingResource" />
-    <bean id="ValidationInterceptor" class="org.wso2.carbon.device.mgt.jaxrs.exception.ValidationInterceptor"/>
+    <bean id="ValidationInterceptor" class="org.wso2.carbon.device.mgt.jaxrs.common.interceptors.ValidationInterceptor"/>
     <bean id="GlobalExceptionMapper" class="org.wso2.carbon.device.mgt.jaxrs.exception.GlobalThrowableMapper"/>
 
     <bean id="swaggerConfig" class="io.swagger.jaxrs.config.BeanConfig">

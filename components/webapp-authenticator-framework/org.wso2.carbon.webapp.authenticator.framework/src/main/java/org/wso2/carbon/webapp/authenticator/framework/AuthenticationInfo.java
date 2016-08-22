@@ -30,6 +30,7 @@ public class AuthenticationInfo {
     private String username;
     private String tenantDomain;
     private int tenantId = -1;
+    private String scopes[];
 
     public WebappAuthenticator.Status getStatus() {
         return status;
@@ -70,5 +71,13 @@ public class AuthenticationInfo {
 
     public void setTenantId(int tenantId) {
         this.tenantId = tenantId;
+    }
+
+    public String[] getScopes() {
+        return scopes;
+    }
+
+    public void setScopes(String[] scopes) {
+        this.scopes = scopes;
     }
 }

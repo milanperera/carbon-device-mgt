@@ -16,7 +16,7 @@
  * under the License.
  */
 
-package org.wso2.carbon.device.mgt.jaxrs.exception;
+package org.wso2.carbon.device.mgt.jaxrs.common.interceptors;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -28,6 +28,7 @@ import org.apache.cxf.message.Message;
 import org.apache.cxf.message.MessageContentsList;
 import org.apache.cxf.phase.AbstractPhaseInterceptor;
 import org.apache.cxf.phase.Phase;
+import org.wso2.carbon.device.mgt.jaxrs.exception.ConstraintViolationException;
 
 import javax.validation.ConstraintViolation;
 import javax.validation.Validation;
@@ -89,7 +90,7 @@ public class ValidationInterceptor extends AbstractPhaseInterceptor<Message> {
 
     }
 
-    public <T> void validate(final Method method, final Object[] arguments, final T instance) {
+    private <T> void validate(final Method method, final Object[] arguments, final T instance) {
         if (validator == null) {
             log.warn("Bean Validation provider could not be found, no validation will be performed");
             return;
@@ -104,7 +105,7 @@ public class ValidationInterceptor extends AbstractPhaseInterceptor<Message> {
         }
     }
 
-    public <T> void validate(final T object) {
+    private <T> void validate(final T object) {
         if (validator == null) {
             log.warn("Bean Validation provider could be found, no validation will be performed");
             return;

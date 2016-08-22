@@ -44,10 +44,10 @@ public class ScopeManagementServiceImpl implements ScopeManagementService {
     }
 
     @Override
-    public void updateScopes(List<Scope> scopes) throws ScopeManagementException {
+    public void addScopes(List<Scope> scopes) throws ScopeManagementException {
         try {
             ScopeManagementDAOFactory.beginTransaction();
-            scopeManagementDAO.updateScopes(scopes);
+            scopeManagementDAO.addScopes(scopes);
             ScopeManagementDAOFactory.commitTransaction();
         } catch (TransactionManagementException e) {
             ScopeManagementDAOFactory.rollbackTransaction();
@@ -55,6 +55,23 @@ public class ScopeManagementServiceImpl implements ScopeManagementService {
         } catch (ScopeManagementDAOException e) {
             ScopeManagementDAOFactory.rollbackTransaction();
             throw new ScopeManagementException("Error occurred while adding the scopes to database.", e);
+        } finally {
+            ScopeManagementDAOFactory.closeConnection();
+        }
+    }
+
+    @Override
+    public void updateScopes(List<Scope> scopes) throws ScopeManagementException {
+        try {
+            ScopeManagementDAOFactory.beginTransaction();
+            scopeManagementDAO.updateScopes(scopes);
+            ScopeManagementDAOFactory.commitTransaction();
+        } catch (TransactionManagementException e) {
+            ScopeManagementDAOFactory.rollbackTransaction();
+            throw new ScopeManagementException("Transactional error occurred while updating the scopes.", e);
+        } catch (ScopeManagementDAOException e) {
+            ScopeManagementDAOFactory.rollbackTransaction();
+            throw new ScopeManagementException("Error occurred while updating the scopes to database.", e);
         } finally {
             ScopeManagementDAOFactory.closeConnection();
         }
@@ -78,10 +95,10 @@ public class ScopeManagementServiceImpl implements ScopeManagementService {
             ScopeManagementDAOFactory.commitTransaction();
         } catch (TransactionManagementException e) {
             ScopeManagementDAOFactory.rollbackTransaction();
-            throw new ScopeManagementException("Transactional error occurred while adding the scopes.", e);
+            throw new ScopeManagementException("Transactional error occurred while updating the scopes.", e);
         } catch (ScopeManagementDAOException e) {
             ScopeManagementDAOFactory.rollbackTransaction();
-            throw new ScopeManagementException("Error occurred while adding the scopes to database.", e);
+            throw new ScopeManagementException("Error occurred while updating the scopes to database.", e);
         } finally {
             ScopeManagementDAOFactory.closeConnection();
         }
@@ -168,6 +185,11 @@ public class ScopeManagementServiceImpl implements ScopeManagementService {
             filteredRoles.clear();
         }
         this.updateScopes(scopes);
+    }
+
+    @Override
+    public boolean isScopeExist(String scopeKey) throws ScopeManagementException {
+        return false;
     }
 
 }

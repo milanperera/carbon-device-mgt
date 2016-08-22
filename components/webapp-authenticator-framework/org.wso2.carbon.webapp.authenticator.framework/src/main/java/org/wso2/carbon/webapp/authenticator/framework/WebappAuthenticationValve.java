@@ -65,6 +65,7 @@ public class WebappAuthenticationValve extends CarbonTomcatValve {
                 privilegedCarbonContext.setTenantId(authenticationInfo.getTenantId());
                 privilegedCarbonContext.setTenantDomain(authenticationInfo.getTenantDomain());
                 privilegedCarbonContext.setUsername(authenticationInfo.getUsername());
+                this.setScopes(request, authenticationInfo);
                 this.processRequest(request, response, compositeValve, authenticationInfo);
             } finally {
                 PrivilegedCarbonContext.endTenantFlow();
@@ -133,6 +134,10 @@ public class WebappAuthenticationValve extends CarbonTomcatValve {
             }
         }
         return nonSecuredEndpoints.containsKey(uri);
+    }
+
+    private void setScopes(Request request, AuthenticationInfo authenticationInfo) {
+        request.getServletContext().setAttribute(Constants.RESOURCE_SCOPES, authenticationInfo.getScopes());
     }
 
     private void processRequest(Request request, Response response, CompositeValve compositeValve,

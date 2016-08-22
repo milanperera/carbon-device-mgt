@@ -82,15 +82,21 @@ public class RemoteOAuthValidator implements OAuth2TokenValidator {
         boolean isValid = validationResponse.getValid();
         String tenantDomain;
         String username;
+        String scopes[];
+        OAuthValidationResponse oAuthValidationResponse = new OAuthValidationResponse();
         if (isValid) {
             username = MultitenantUtils.getTenantAwareUsername(validationResponse.getAuthorizedUser());
             tenantDomain = MultitenantUtils.getTenantDomain(validationResponse.getAuthorizedUser());
+            scopes = validationResponse.getScope();
+            oAuthValidationResponse.setUserName(username);
+            oAuthValidationResponse.setTenantDomain(tenantDomain);
+            oAuthValidationResponse.setIsValid(isValid);
+            oAuthValidationResponse.setScopes(scopes);
+            return oAuthValidationResponse;
         } else {
-            OAuthValidationResponse oAuthValidationResponse = new OAuthValidationResponse();
             oAuthValidationResponse.setErrorMsg(validationResponse.getErrorMsg());
             return oAuthValidationResponse;
         }
-        return new OAuthValidationResponse(username, tenantDomain, isValid);
     }
 
     private OAuth2TokenValidationRequestDTO createValidationRequest(String accessToken, String resource) {

@@ -30,6 +30,9 @@ public class DeviceAuthorizationResult {
 
     private List<DeviceIdentifier> authorizedDevices = new ArrayList<>();
     private List<DeviceIdentifier> unauthorizedDevices = new ArrayList<>();
+    private boolean isDeviceAdmin;
+    private boolean isDeviceOwner;
+    private String authorizedUser;
 
     public List<DeviceIdentifier> getAuthorizedDevices() {
         return authorizedDevices;
@@ -54,5 +57,29 @@ public class DeviceAuthorizationResult {
 
     public void addUnauthorizedDevice(DeviceIdentifier deviceIdentifier) {
         unauthorizedDevices.add(deviceIdentifier);
+    }
+
+    public boolean isDeviceAdmin() {
+        return isDeviceAdmin;
+    }
+
+    public void setDeviceAdmin(boolean deviceAdmin) {
+        isDeviceAdmin = deviceAdmin;
+    }
+
+    public boolean isDeviceOwner() {
+        return isDeviceOwner;
+    }
+
+    public void setDeviceOwner(boolean deviceOwner) {
+        isDeviceOwner = deviceOwner;
+    }
+
+    public String getAuthorizedUser() {
+        return authorizedUser;
+    }
+
+    public void setAuthorizedUser(String authorizedUser) {
+        this.authorizedUser = authorizedUser;
     }
 }

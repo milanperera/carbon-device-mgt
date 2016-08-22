@@ -27,6 +27,13 @@ import org.wso2.carbon.apimgt.api.model.Scope;
 public interface ScopeManagementService {
 
     /**
+     * This method is used to add the given list of scopes.
+     *
+     * @param scopes List of scopes to be added.
+     * @throws ScopeManagementException
+     */
+    void addScopes(List<Scope> scopes) throws ScopeManagementException;
+    /**
      * This method is used to update the given list of scopes.
      *
      * @param scopes List of scopes to be updated.
@@ -74,5 +81,14 @@ public interface ScopeManagementService {
      * @throws ScopeManagementException
      */
     void removeScopes(String roleName) throws ScopeManagementException;
+
+    /**
+     * This method is used to check whether the given scope exists.
+     *
+     * @param scope Scope to be check
+     * @return returns true if exists
+     * @throws ScopeManagementException
+     */
+    boolean isScopeExist(String scope) throws ScopeManagementException;
 
 }

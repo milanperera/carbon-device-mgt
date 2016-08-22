@@ -21,8 +21,10 @@ package org.wso2.carbon.apimgt.webapp.publisher;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.w3c.dom.Document;
+import org.wso2.carbon.apimgt.api.model.Scope;
 import org.wso2.carbon.context.CarbonContext;
 import org.wso2.carbon.context.PrivilegedCarbonContext;
+import org.wso2.carbon.device.mgt.common.scope.mgt.ScopeManagementException;
 import org.wso2.carbon.device.mgt.common.scope.mgt.ScopeManagementService;
 import org.wso2.carbon.user.api.UserRealm;
 import org.wso2.carbon.user.api.UserStoreException;
@@ -33,6 +35,8 @@ import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * This class contains the util methods which are needed
@@ -83,6 +87,34 @@ public class WebappPublisherUtil {
         }
         realm = realmService.getTenantUserRealm(CARBON_SUPER);
         return realm;
+    }
+
+    public static void addScope(String scopeKey) throws ScopeManagementException {
+        List<Scope> scopes = new ArrayList<>();
+        String adminRole = null;
+        Scope scope = new Scope();
+        scope.setKey(scopeKey);
+
+        try {
+            UserRealm userRealm = getUserRealm();
+            if (userRealm != null) {
+                adminRole = userRealm.getRealmConfiguration().getAdminRoleName();
+            }
+        } catch (UserStoreException e) {
+            // not throwing the exception forward because this scope can exist without a role
+            log.error("Cannot add default admin role to '" + scopeKey + "' scope");
+        }
+
+        if (adminRole != null && !adminRole.isEmpty()) {
+            scope.setRoles(adminRole);
+        }
+        scopes.add(scope);
+        ScopeManagementService scopeManagementService = getScopeManagementService();
+        if (scopeManagementService != null) {
+            if (!scopeManagementService.isScopeExist(scopeKey)) {
+                scopeManagementService.addScopes(scopes);
+            }
+        }
     }
 
 }

@@ -34,6 +34,33 @@ import java.util.List;
 public class ScopeManagementDAOImpl implements ScopeManagementDAO {
 
     @Override
+    public void addScopes(List<Scope> scopes) throws ScopeManagementDAOException {
+        Connection conn;
+        PreparedStatement stmt = null;
+        ResultSet rs = null;
+
+        try {
+            conn = this.getConnection();
+            String sql = "INSERT INTO IDN_OAUTH2_SCOPE (SCOPE_KEY, NAME, DESCRIPTION, ROLES) VALUES (?, ?, ?, ?)";
+            stmt = conn.prepareStatement(sql);
+
+            // creating a batch request
+            for (Scope scope : scopes) {
+                stmt.setString(1, scope.getKey());
+                stmt.setString(2, scope.getName());
+                stmt.setString(3, scope.getDescription());
+                stmt.setString(4, scope.getRoles());
+                stmt.addBatch();
+            }
+            stmt.executeBatch();
+        } catch (SQLException e) {
+            throw new ScopeManagementDAOException("Error occurred while adding details of the scopes.", e);
+        } finally {
+            ScopeManagementDAOUtil.cleanupResources(stmt, rs);
+        }
+    }
+
+    @Override
     public void updateScopes(List<Scope> scopes) throws ScopeManagementDAOException {
         Connection conn;
         PreparedStatement stmt = null;
@@ -56,7 +83,6 @@ public class ScopeManagementDAOImpl implements ScopeManagementDAO {
         } finally {
             ScopeManagementDAOUtil.cleanupResources(stmt, rs);
         }
-
     }
 
 
@@ -125,6 +151,28 @@ public class ScopeManagementDAOImpl implements ScopeManagementDAO {
         } finally {
             ScopeManagementDAOUtil.cleanupResources(stmt, rs);
         }
+    }
+
+    public boolean isScopeExist(String scopeKey) throws ScopeManagementDAOException {
+        Connection conn;
+        PreparedStatement stmt = null;
+        ResultSet rs = null;
+
+        try {
+            conn = this.getConnection();
+            String sql = "SELECT * FROM IDN_OAUTH2_SCOPE WHERE SCOPE_KEY = ?";
+            stmt = conn.prepareStatement(sql);
+            stmt.setString(1, scopeKey);
+            rs = stmt.executeQuery();
+            if (rs.next()) {
+                return true;
+            }
+        } catch (SQLException e) {
+            throw new ScopeManagementDAOException("Error occurred while fetching the details of the scopes.", e);
+        } finally {
+            ScopeManagementDAOUtil.cleanupResources(stmt, rs);
+        }
+        return false;
     }
 
     private Connection getConnection() throws SQLException {

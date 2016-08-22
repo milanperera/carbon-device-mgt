@@ -28,10 +28,12 @@ import org.wso2.carbon.apimgt.api.model.API;
 import org.wso2.carbon.apimgt.webapp.publisher.APIConfig;
 import org.wso2.carbon.apimgt.webapp.publisher.APIPublisherService;
 import org.wso2.carbon.apimgt.webapp.publisher.APIPublisherUtil;
+import org.wso2.carbon.apimgt.webapp.publisher.WebappPublisherUtil;
 import org.wso2.carbon.apimgt.webapp.publisher.config.APIResourceConfiguration;
 import org.wso2.carbon.apimgt.webapp.publisher.config.WebappPublisherConfig;
 import org.wso2.carbon.apimgt.webapp.publisher.internal.APIPublisherDataHolder;
 import org.wso2.carbon.apimgt.webapp.publisher.lifecycle.util.AnnotationProcessor;
+import org.wso2.carbon.device.mgt.common.scope.mgt.ScopeManagementException;
 
 import javax.servlet.ServletContext;
 import java.io.IOException;
@@ -43,6 +45,7 @@ public class APIPublisherLifecycleListener implements LifecycleListener {
 
     private static final Log log = LogFactory.getLog(APIPublisherLifecycleListener.class);
     private static final String PARAM_MANAGED_API_ENABLED = "managed-api-enabled";
+    public static final String PARAM_DEVICE_MGT_ADMIN_SCOPE = "device-mgt-admin-scope";
     public static final String PROPERTY_PROFILE = "profile";
     public static final String PROFILE_DT_WORKER = "dtWorker";
     public static final String PROFILE_DEFAULT = "default";
@@ -55,6 +58,15 @@ public class APIPublisherLifecycleListener implements LifecycleListener {
             ServletContext servletContext = context.getServletContext();
             String param = servletContext.getInitParameter(PARAM_MANAGED_API_ENABLED);
             boolean isManagedApi = (param != null && !param.isEmpty()) && Boolean.parseBoolean(param);
+
+            param = servletContext.getInitParameter(PARAM_DEVICE_MGT_ADMIN_SCOPE);
+            if (param != null && !param.isEmpty()) {
+                try {
+                    WebappPublisherUtil.addScope(param);
+                } catch (ScopeManagementException e) {
+                    log.error("Error occurred while adding scope '" + param + "'", e);
+                }
+            }
 
             String profile = System.getProperty(PROPERTY_PROFILE);
 

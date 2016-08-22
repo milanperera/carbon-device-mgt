@@ -28,6 +28,14 @@ import java.util.List;
 public interface ScopeManagementDAO {
 
     /**
+     * This method is used to add the list of scopes.
+     *
+     * @param scopes List of scopes to be added.
+     * @throws ScopeManagementDAOException
+     */
+    void addScopes(List<Scope> scopes) throws ScopeManagementDAOException;
+
+    /**
      * This method is used to update the list of scopes.
      *
      * @param scopes List of scopes to be updated.
@@ -60,5 +68,13 @@ public interface ScopeManagementDAO {
      * @throws ScopeManagementDAOException
      */
     List<Scope> getScopesHavingRole(String roleName) throws ScopeManagementDAOException;
+
+    /**
+     * This method is used to check whether the given scope is exists.
+     * @param scopeKey scope key to be checked
+     * @return returns true if exists
+     * @throws ScopeManagementDAOException
+     */
+    boolean isScopeExist(String scopeKey) throws ScopeManagementDAOException;
 
 }
