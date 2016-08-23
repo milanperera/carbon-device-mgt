@@ -49,7 +49,6 @@
                         </Export-Package>
                         <Import-Package>
                             javax.xml.bind.annotation,
-                            javax.servlet.*,
                             com.fasterxml.jackson.annotation,
                             org.wso2.carbon.apimgt.api.model,
                             io.swagger.annotations.*;resolution:=optional
@@ -73,10 +72,6 @@
         <dependency>
             <groupId>org.wso2.carbon.apimgt</groupId>
             <artifactId>org.wso2.carbon.apimgt.api</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>javax.servlet</groupId>
-            <artifactId>servlet-api</artifactId>
         </dependency>
     </dependencies>
 

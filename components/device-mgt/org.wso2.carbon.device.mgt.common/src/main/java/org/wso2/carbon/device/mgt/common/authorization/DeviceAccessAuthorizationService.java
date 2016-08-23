@@ -20,7 +20,6 @@ package org.wso2.carbon.device.mgt.common.authorization;
 
 import org.wso2.carbon.device.mgt.common.DeviceIdentifier;
 
-import javax.servlet.ServletContext;
 import java.util.List;
 
 

@@ -32,20 +32,15 @@ import org.wso2.carbon.device.mgt.common.authorization.DeviceAccessAuthorization
 import org.wso2.carbon.device.mgt.common.authorization.DeviceAuthorizationResult;
 import org.wso2.carbon.device.mgt.common.group.mgt.DeviceGroup;
 import org.wso2.carbon.device.mgt.common.group.mgt.GroupManagementException;
-import org.wso2.carbon.device.mgt.common.permission.mgt.Permission;
-import org.wso2.carbon.device.mgt.common.permission.mgt.PermissionManagementException;
 import org.wso2.carbon.device.mgt.common.scope.mgt.ScopeManagementException;
 import org.wso2.carbon.device.mgt.common.scope.mgt.ScopeManagementService;
 import org.wso2.carbon.device.mgt.core.config.DeviceConfigurationManager;
-import org.wso2.carbon.device.mgt.core.config.DeviceManagementConfig;
 import org.wso2.carbon.device.mgt.core.internal.DeviceManagementDataHolder;
-import org.wso2.carbon.device.mgt.core.permission.mgt.PermissionUtils;
 import org.wso2.carbon.user.api.UserRealm;
 import org.wso2.carbon.user.api.UserStoreException;
 import org.wso2.carbon.user.api.UserStoreManager;
 import org.wso2.carbon.user.core.service.RealmService;
 
-import javax.servlet.ServletContext;
 import java.util.*;
 
 /**
@@ -273,14 +268,16 @@ public class DeviceAccessAuthorizationServiceImpl implements DeviceAccessAuthori
     private void addDeviceManagementAdminScope() throws ScopeManagementException, UserStoreException {
         ScopeManagementService scopeManagementService =
                 DeviceManagementDataHolder.getInstance().getScopeManagementService();
-        String adminRole = this.getUserRealm().getRealmConfiguration().getAdminRoleName();
-        Scope adminScope = new Scope();
-        adminScope.setKey(deviceMgtAdminScope);
-        adminScope.setRoles(adminRole);
-
-        List<Scope> scopes = new ArrayList<>();
-        scopes.add(adminScope);
-        scopeManagementService.addScopes(scopes);
+        if (!scopeManagementService.isScopeExist(deviceMgtAdminScope)) {
+            String adminRole = this.getUserRealm().getRealmConfiguration().getAdminRoleName();
+            Scope adminScope = new Scope();
+            adminScope.setKey(deviceMgtAdminScope);
+            adminScope.setName("Device management admin");
+            adminScope.setRoles(adminRole);
+            List<Scope> scopes = new ArrayList<>();
+            scopes.add(adminScope);
+            scopeManagementService.addScopes(scopes);
+        }
     }
 
     private Map<String, String> getOwnershipOfDevices(List<Device> devices) {
