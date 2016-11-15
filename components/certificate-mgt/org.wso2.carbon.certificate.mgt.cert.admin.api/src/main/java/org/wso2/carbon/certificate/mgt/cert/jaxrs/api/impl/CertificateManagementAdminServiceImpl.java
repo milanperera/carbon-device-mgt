@@ -3,22 +3,21 @@ package org.wso2.carbon.certificate.mgt.cert.jaxrs.api.impl;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.certificate.mgt.cert.jaxrs.api.CertificateManagementAdminService;
-import org.wso2.carbon.certificate.mgt.cert.jaxrs.api.UnexpectedServerErrorException;
 import org.wso2.carbon.certificate.mgt.cert.jaxrs.api.beans.CertificateList;
 import org.wso2.carbon.certificate.mgt.cert.jaxrs.api.beans.EnrollmentCertificate;
 import org.wso2.carbon.certificate.mgt.cert.jaxrs.api.beans.ErrorResponse;
-import org.wso2.carbon.certificate.mgt.cert.jaxrs.api.util.DeviceMgtAPIUtils;
+import org.wso2.carbon.certificate.mgt.cert.jaxrs.api.util.CertificateMgtAPIUtils;
 import org.wso2.carbon.certificate.mgt.cert.jaxrs.api.util.RequestValidationUtil;
-import org.wso2.carbon.certificate.mgt.core.dao.CertificateManagementDAOException;
 import org.wso2.carbon.certificate.mgt.core.dto.CertificateResponse;
+import org.wso2.carbon.certificate.mgt.core.exception.CertificateManagementException;
 import org.wso2.carbon.certificate.mgt.core.exception.KeystoreException;
 import org.wso2.carbon.certificate.mgt.core.service.CertificateManagementService;
+import org.wso2.carbon.certificate.mgt.core.service.PaginationResult;
 import org.wso2.carbon.context.PrivilegedCarbonContext;
-import org.wso2.carbon.device.mgt.common.PaginationRequest;
-import org.wso2.carbon.device.mgt.common.PaginationResult;
 
 import javax.ws.rs.*;
 import javax.ws.rs.core.Response;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -39,13 +38,15 @@ public class CertificateManagementAdminServiceImpl implements CertificateManagem
         CertificateManagementService certificateService;
         List<org.wso2.carbon.certificate.mgt.core.bean.Certificate> certificates = new ArrayList<>();
         org.wso2.carbon.certificate.mgt.core.bean.Certificate certificate;
-        certificateService = DeviceMgtAPIUtils.getCertificateManagementService();
+        certificateService = CertificateMgtAPIUtils.getCertificateManagementService();
         try {
             for (EnrollmentCertificate enrollmentCertificate : enrollmentCertificates) {
                 certificate = new org.wso2.carbon.certificate.mgt.core.bean.Certificate();
                 certificate.setTenantId(PrivilegedCarbonContext.getThreadLocalCarbonContext().getTenantId());
-                certificate.setSerial(enrollmentCertificate.getSerial());
-                certificate.setCertificate(certificateService.pemToX509Certificate(enrollmentCertificate.getPem()));
+                X509Certificate x509Certificate = certificateService
+                        .pemToX509Certificate(enrollmentCertificate.getPem());
+                certificate.setSerial(x509Certificate.getSerialNumber().toString());
+                certificate.setCertificate(x509Certificate);
                 certificates.add(certificate);
             }
             certificateService.saveCertificate(certificates);
@@ -53,8 +54,8 @@ public class CertificateManagementAdminServiceImpl implements CertificateManagem
         } catch (KeystoreException e) {
             String msg = "Error occurred while converting PEM file to X509Certificate.";
             log.error(msg, e);
-            throw new UnexpectedServerErrorException(
-                    new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build());
+            return Response.serverError().entity(
+                    new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build()).build();
         }
     }
 
@@ -71,16 +72,16 @@ public class CertificateManagementAdminServiceImpl implements CertificateManagem
             @HeaderParam("If-Modified-Since") String ifModifiedSince) {
         RequestValidationUtil.validateSerialNumber(serialNumber);
 
-        CertificateManagementService certificateService = DeviceMgtAPIUtils.getCertificateManagementService();
+        CertificateManagementService certificateService = CertificateMgtAPIUtils.getCertificateManagementService();
         List<CertificateResponse> certificateResponse;
         try {
             certificateResponse = certificateService.searchCertificates(serialNumber);
             return Response.status(Response.Status.OK).entity(certificateResponse).build();
-        } catch (CertificateManagementDAOException e) {
+        } catch (CertificateManagementException e) {
             String msg = "Error occurred while converting PEM file to X509Certificate";
             log.error(msg, e);
-            throw new UnexpectedServerErrorException(
-                    new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build());
+            return Response.serverError().entity(
+                    new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build()).build();
         }
     }
 
@@ -97,20 +98,18 @@ public class CertificateManagementAdminServiceImpl implements CertificateManagem
             @QueryParam("limit") int limit,
             @HeaderParam("If-Modified-Since") String ifModifiedSince) {
         RequestValidationUtil.validatePaginationInfo(offset, limit);
-
-        CertificateManagementService certificateService = DeviceMgtAPIUtils.getCertificateManagementService();
-        PaginationRequest paginationRequest = new PaginationRequest(offset, limit);
+        CertificateManagementService certificateService = CertificateMgtAPIUtils.getCertificateManagementService();
         try {
-            PaginationResult result = certificateService.getAllCertificates(paginationRequest);
+            PaginationResult result = certificateService.getAllCertificates(offset, limit);
             CertificateList certificates = new CertificateList();
             certificates.setCount(result.getRecordsTotal());
             certificates.setList((List<CertificateResponse>) result.getData());
             return Response.status(Response.Status.OK).entity(certificates).build();
-        } catch (CertificateManagementDAOException e) {
+        } catch (CertificateManagementException e) {
             String msg = "Error occurred while fetching all certificates.";
             log.error(msg, e);
-            throw new UnexpectedServerErrorException(
-                    new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build());
+            return Response.serverError().entity(
+                    new ErrorResponse.ErrorResponseBuilder().setMessage(msg).build()).build();
         }
     }
 
@@ -119,20 +118,24 @@ public class CertificateManagementAdminServiceImpl implements CertificateManagem
     public Response removeCertificate(@PathParam("serialNumber") String serialNumber) {
         RequestValidationUtil.validateSerialNumber(serialNumber);
 
-        CertificateManagementService certificateService = DeviceMgtAPIUtils.getCertificateManagementService();
+        CertificateManagementService certificateService = CertificateMgtAPIUtils.getCertificateManagementService();
         try {
             boolean status = certificateService.removeCertificate(serialNumber);
             if (!status) {
-                Response.status(Response.Status.NOT_FOUND).entity("No certificate is found with the given " +
-                        "serial number '" + serialNumber + "'");
+                return Response.status(Response.Status.NOT_FOUND).entity(
+                        "No certificate is found with the given " +
+                                "serial number '" + serialNumber + "'").build();
+            } else {
+                return Response.status(Response.Status.OK).entity(
+                        "Certificate that carries the serial number '" +
+                                serialNumber + "' has been removed").build();
             }
-            return Response.status(Response.Status.OK).entity("Certificate that carries the serial number '" +
-                    serialNumber + "' has been removed").build();
-        } catch (CertificateManagementDAOException e) {
+        } catch (CertificateManagementException e) {
             String msg = "Error occurred while converting PEM file to X509Certificate";
             log.error(msg, e);
-            throw new UnexpectedServerErrorException(
-                    new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build());
+            return Response.serverError().entity(
+                    new ErrorResponse.ErrorResponseBuilder().setMessage(msg).build()).build();
         }
     }
+
 }

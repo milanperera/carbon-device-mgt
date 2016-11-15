@@ -22,6 +22,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.w3c.dom.Document;
 import org.wso2.carbon.device.mgt.common.Device;
+import org.wso2.carbon.device.mgt.common.DeviceIdentifier;
 import org.wso2.carbon.device.mgt.common.configuration.mgt.ConfigurationEntry;
 import org.wso2.carbon.device.mgt.common.configuration.mgt.ConfigurationManagementException;
 import org.wso2.carbon.device.mgt.common.configuration.mgt.PlatformConfiguration;
@@ -44,6 +45,7 @@ import javax.cache.Cache;
 import javax.cache.CacheManager;
 import javax.cache.Caching;
 import javax.sql.DataSource;
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.ByteArrayOutputStream;
@@ -53,17 +55,16 @@ import java.util.*;
 
 public class PolicyManagerUtil {
 
-    private static final Log log = LogFactory.getLog(PolicyManagerUtil.class);
-
     public static final String GENERAL_CONFIG_RESOURCE_PATH = "general";
     public static final String MONITORING_FREQUENCY = "notifierFrequency";
-
+    private static final Log log = LogFactory.getLog(PolicyManagerUtil.class);
 
     public static Document convertToDocument(File file) throws PolicyManagementException {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         factory.setNamespaceAware(true);
         try {
             DocumentBuilder docBuilder = factory.newDocumentBuilder();
+            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
             return docBuilder.parse(file);
         } catch (Exception e) {
             throw new PolicyManagementException("Error occurred while parsing file, while converting " +
@@ -153,11 +154,7 @@ public class PolicyManagerUtil {
 
     public static boolean convertIntToBoolean(int x) {
 
-        if (x == 1) {
-            return true;
-        } else {
-            return false;
-        }
+        return x == 1;
     }
 
 
@@ -196,7 +193,7 @@ public class PolicyManagerUtil {
     }
 
 
-    public static int getMonitoringFequency() throws PolicyManagementException {
+    public static int getMonitoringFrequency() throws PolicyManagementException {
 
         PlatformConfigurationManagementService configMgtService = new PlatformConfigurationManagementServiceImpl();
         PlatformConfiguration tenantConfiguration;
@@ -207,7 +204,7 @@ public class PolicyManagerUtil {
 
             if (configuration != null && !configuration.isEmpty()) {
                 for (ConfigurationEntry cEntry : configuration) {
-                    if (cEntry.getName().equalsIgnoreCase(MONITORING_FREQUENCY)) {
+                    if (MONITORING_FREQUENCY.equalsIgnoreCase(cEntry.getName())) {
                         if (cEntry.getValue() == null) {
                             throw new PolicyManagementException("Invalid value, i.e. '" + cEntry.getValue() +
                                     "', is configured as the monitoring frequency");

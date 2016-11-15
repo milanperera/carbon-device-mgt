@@ -22,7 +22,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.device.mgt.common.permission.mgt.Permission;
 
-import java.util.List;
 import java.util.StringTokenizer;
 
 /**
@@ -54,10 +53,7 @@ public class PermissionTree {
             tempChild = new PermissionNode(st.nextToken());
             tempRoot = addPermissionNode(tempRoot, tempChild);
         }
-        tempRoot.addPermission(permission); //setting permission to the vertex
-        if (log.isDebugEnabled()) {
-            log.debug("Added permission '" + permission.getName() + "'");
-        }
+        tempRoot.addPermission(permission.getMethod(), permission); //setting permission to the vertex
     }
 
     /**
@@ -82,10 +78,11 @@ public class PermissionTree {
      * Breath First Search (BFS) is used to traverse the tree.
      *
      * @param url        Request URL.
+     * @param httpMethod HTTP method of the request.
      * @return returns the permission with related to the request path or null if there is
      * no any permission that is stored with respected to the given request path.
      */
-    public List<Permission> getPermission(String url) {
+    public Permission getPermission(String url, String httpMethod) {
         StringTokenizer st = new StringTokenizer(url, ROOT);
         PermissionNode tempRoot;
         PermissionNode currentRoot = rootNode;
@@ -111,6 +108,6 @@ public class PermissionTree {
             }
             currentRoot = tempRoot;
         }
-        return currentRoot.getPermissions();
+        return currentRoot.getPermission(httpMethod);
     }
 }

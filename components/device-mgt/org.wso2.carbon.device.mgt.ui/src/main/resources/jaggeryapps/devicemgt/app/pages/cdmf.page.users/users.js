@@ -26,31 +26,22 @@ function onRequest(context) {
             return options.fn(this);
         }
     });
+
     var page = {};
-    var userModule = require("/app/modules/user.js")["userModule"];
-    var deviceMgtProps = require("/app/conf/devicemgt-props.js").config();
-    page["permissions"] = userModule.getUIPermissions();
-    if (userModule.isAuthorized("/permission/admin/device-mgt/users/delete")) {
-        page["removePermitted"] = true;
+    var userModule = require("/app/modules/business-controllers/user.js")["userModule"];
+    var deviceMgtProps = require("/app/modules/conf-reader/main.js")["conf"];
+
+    page["currentUser"] = userModule.getCarbonUser().username;
+    page["adminUser"] = deviceMgtProps["adminUser"].split("@")[0];
+
+    if (userModule.isAuthorized("/permission/admin/device-mgt/users/manage")) {
+        page.canManage = true;
     }
 
-    if (userModule.isAuthorized("/permission/admin/device-mgt/users/remove")) {
-        page["removePermitted"] = true;
-    }
-
-    if (userModule.isAuthorized("/permission/admin/device-mgt/users/update")) {
-        page["editPermitted"] = true;
-    }
     if (userModule.isAuthorized("/permission/admin/device-mgt/users/view")) {
-        page["viewPermitted"] = true;
-    }
-    if (userModule.isAuthorized("/permission/admin/device-mgt/users/invite")) {
-        page["invitePermitted"] = true;
-    }
-    if (userModule.isAuthorized("/permission/admin/device-mgt/users/reset-password")) {
-        page["resetPasswordPermitted"] = true;
+        page.canView = true;
     }
 
-    page["adminUser"] = deviceMgtProps.adminUser;
+
     return page;
 }

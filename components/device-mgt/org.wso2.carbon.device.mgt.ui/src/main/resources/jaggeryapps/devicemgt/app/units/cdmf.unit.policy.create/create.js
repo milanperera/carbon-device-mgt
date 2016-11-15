@@ -21,14 +21,20 @@ function onRequest(context) {
     var DTYPE_CONF_DEVICE_TYPE_LABEL_KEY = "label";
 
     var utility = require("/app/modules/utility.js").utility;
-    var userModule = require("/app/modules/user.js")["userModule"];
+    var userModule = require("/app/modules/business-controllers/user.js")["userModule"];
 
     var types = {};
+
+    types.isAuthorized = userModule.isAuthorized("/permission/admin/device-mgt/policies/manage");
+    types.isAuthorizedViewUsers = userModule.isAuthorized("/permission/admin/device-mgt/roles/view");
+    types.isAuthorizedViewRoles = userModule.isAuthorized("/permission/admin/device-mgt/users/view");
     types["types"] = [];
-    var typesListResponse = userModule.getPlatforms();
+    var typesListResponse = deviceModule.getDeviceTypes();
     if (typesListResponse["status"] == "success") {
         for (var type in typesListResponse["content"]) {
-            var deviceType = typesListResponse["content"][type]["name"];
+            var content = {};
+            var deviceType = typesListResponse["content"]["deviceTypes"][type];
+            content["name"] = deviceType;
             var configs = utility.getDeviceTypeConfig(deviceType);
             var deviceTypeLabel = deviceType;
             if (configs && configs[DTYPE_CONF_DEVICE_TYPE_KEY][DTYPE_CONF_DEVICE_TYPE_LABEL_KEY]) {
@@ -36,9 +42,9 @@ function onRequest(context) {
             }
             var policyWizard = new File("/app/units/" + utility.getTenantedDeviceUnitName(deviceType, "policy-wizard"));
             if(policyWizard.isExists()){
-                typesListResponse["content"][type]["icon"] = utility.getDeviceThumb(deviceType);
-                typesListResponse["content"][type]["label"] = deviceTypeLabel;
-                types["types"].push(typesListResponse["content"][type]);
+                content["icon"] = utility.getDeviceThumb(deviceType);
+                content["label"] = deviceTypeLabel;
+                types["types"].push(content);
             }
         }
     }

@@ -19,11 +19,8 @@
 package org.wso2.carbon.device.mgt.extensions.feature.mgt.util;
 
 import org.apache.catalina.core.StandardContext;
-import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.scannotation.AnnotationDB;
-import org.scannotation.WarUrlFinder;
 import org.wso2.carbon.device.mgt.common.Feature;
 import org.wso2.carbon.device.mgt.extensions.feature.mgt.annotations.DeviceType;
 
@@ -38,11 +35,14 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.QueryParam;
+import java.io.File;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
@@ -65,6 +65,7 @@ public class AnnotationProcessor {
     private static final String STRING_ARR = "string_arr";
     private static final String STRING = "string";
     private static final String METHOD = "method";
+    private static final String DEVICE_TYPE_CLASS_NAME = DeviceType.class.getName();
     private Class<org.wso2.carbon.device.mgt.extensions.feature.mgt.annotations.Feature>
             featureAnnotationClazz;
     private ClassLoader classLoader;
@@ -80,17 +81,19 @@ public class AnnotationProcessor {
      * Scan the context for classes with annotations
      */
     public Set<String> scanStandardContext(String className) throws IOException {
-        AnnotationDB db = new AnnotationDB();
-        db.addIgnoredPackages(PACKAGE_ORG_APACHE);
-        db.addIgnoredPackages(PACKAGE_ORG_CODEHAUS);
-        db.addIgnoredPackages(PACKAGE_ORG_SPRINGFRAMEWORK);
-        URL[] libPath = WarUrlFinder.findWebInfLibClasspaths(servletContext);
-        URL classPath = WarUrlFinder.findWebInfClassesPath(servletContext);
-        URL[] urls = (URL[]) ArrayUtils.add(libPath, libPath.length, classPath);
-        db.scanArchives(urls);
+        if (DEVICE_TYPE_CLASS_NAME.equals(className)) {
+            ExtendedAnnotationDB db = new ExtendedAnnotationDB();
+            db.addIgnoredPackages(PACKAGE_ORG_APACHE);
+            db.addIgnoredPackages(PACKAGE_ORG_CODEHAUS);
+            db.addIgnoredPackages(PACKAGE_ORG_SPRINGFRAMEWORK);
 
-        //Returns a list of classes with given Annotation
-        return db.getAnnotationIndex().get(className);
+            URL classPath = findWebInfClassesPath(servletContext);
+            db.scanArchives(classPath);
+
+            //Returns a list of classes with given Annotation
+            return db.getAnnotationIndex().get(className);
+        }
+        return null;
     }
 
     /**
@@ -274,6 +277,29 @@ public class AnnotationProcessor {
                 return ((String[]) methodHandler.invoke(annotation, method, null))[0];
             default:
                 return null;
+        }
+    }
+
+    /**
+     * Find the URL pointing to "/WEB-INF/classes"  This method may not work in conjunction with IteratorFactory
+     * if your servlet container does not extract the /WEB-INF/classes into a real file-based directory
+     *
+     * @param servletContext
+     * @return null if cannot determin /WEB-INF/classes
+     */
+    private static URL findWebInfClassesPath(ServletContext servletContext) {
+        String path = servletContext.getRealPath("/WEB-INF/classes");
+        if (path == null) return null;
+        File fp = new File(path);
+        if (fp.exists() == false) return null;
+        try
+        {
+            URI uri = fp.toURI();
+            return uri.toURL();
+        }
+        catch (MalformedURLException e)
+        {
+            throw new RuntimeException(e);
         }
     }
 }

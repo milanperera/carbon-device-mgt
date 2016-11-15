@@ -20,21 +20,19 @@ package org.wso2.carbon.device.mgt.jaxrs.service.impl;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.wso2.carbon.device.mgt.common.DeviceIdentifier;
 import org.wso2.carbon.device.mgt.common.PaginationRequest;
 import org.wso2.carbon.device.mgt.common.PaginationResult;
 import org.wso2.carbon.device.mgt.common.notification.mgt.Notification;
 import org.wso2.carbon.device.mgt.common.notification.mgt.NotificationManagementException;
-import org.wso2.carbon.device.mgt.common.operation.mgt.Operation;
-import org.wso2.carbon.device.mgt.core.service.DeviceManagementProviderService;
-import org.wso2.carbon.device.mgt.jaxrs.NotificationContext;
 import org.wso2.carbon.device.mgt.jaxrs.beans.ErrorResponse;
 import org.wso2.carbon.device.mgt.jaxrs.beans.NotificationList;
 import org.wso2.carbon.device.mgt.jaxrs.service.api.NotificationManagementService;
-import org.wso2.carbon.device.mgt.jaxrs.service.impl.util.*;
-import org.wso2.carbon.device.mgt.jaxrs.service.impl.util.NotFoundException;
+import org.wso2.carbon.device.mgt.jaxrs.service.impl.util.RequestValidationUtil;
+import org.wso2.carbon.device.mgt.jaxrs.service.impl.util.UnexpectedServerErrorException;
 import org.wso2.carbon.device.mgt.jaxrs.util.DeviceMgtAPIUtils;
 
+import javax.validation.constraints.Max;
+import javax.validation.constraints.Size;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -50,41 +48,58 @@ public class NotificationManagementServiceImpl implements NotificationManagement
     @GET
     @Override
     public Response getNotifications(
-            @QueryParam("status") String status,
+            @QueryParam("status") @Size(max = 45) String status,
             @HeaderParam("If-Modified-Since") String ifModifiedSince,
             @QueryParam("offset") int offset, @QueryParam("limit") int limit) {
 
+        RequestValidationUtil.validatePaginationParameters(offset, limit);
         PaginationRequest request = new PaginationRequest(offset, limit);
-        PaginationResult result = null;
+        PaginationResult result;
 
         NotificationList notificationList = new NotificationList();
-        int resultCount = 0;
 
         String msg;
         try {
             if (status != null) {
                 RequestValidationUtil.validateNotificationStatus(status);
                 result = DeviceMgtAPIUtils.getNotificationManagementService().getNotificationsByStatus(
-                        Notification.Status.valueOf(status),request);
-                resultCount = result.getRecordsTotal();
+                        Notification.Status.valueOf(status), request);
             } else {
                 result = DeviceMgtAPIUtils.getNotificationManagementService().getAllNotifications(request);
             }
-
-            if (resultCount == 0) {
-                throw new NotFoundException(
-                        new ErrorResponse.ErrorResponseBuilder().setCode(404l).setMessage("No notification is " +
-                                "available to be retrieved.").build());
-            }
-
-            notificationList.setNotifications((List<Notification>) result.getData());
             notificationList.setCount(result.getRecordsTotal());
+            notificationList.setNotifications((List<Notification>) result.getData());
             return Response.status(Response.Status.OK).entity(notificationList).build();
         } catch (NotificationManagementException e) {
-            msg = "Error occurred while retrieving notification info";
+            msg = "Error occurred while retrieving notification list";
+            log.error(msg, e);
+            return Response.serverError().entity(
+                    new ErrorResponse.ErrorResponseBuilder().setMessage(msg).build()).build();
+        }
+    }
+
+    @PUT
+    @Path("/{id}/mark-checked")
+    public Response updateNotificationStatus(
+            @PathParam("id") @Max(45)int id) {
+        String msg;
+        Notification.Status status = Notification.Status.CHECKED;
+        Notification notification;
+        try {
+            DeviceMgtAPIUtils.getNotificationManagementService().updateNotificationStatus(id, status);
+        } catch (NotificationManagementException e) {
+            msg = "Error occurred while updating notification status.";
             log.error(msg, e);
             throw new UnexpectedServerErrorException(
                     new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build());
+        }
+        try {
+            notification = DeviceMgtAPIUtils.getNotificationManagementService().getNotification(id);
+            return Response.status(Response.Status.OK).entity(notification).build();
+        } catch (NotificationManagementException e) {
+            msg = "Notification updated successfully. But the retrial of the updated notification failed";
+            log.error(msg, e);
+            return Response.status(Response.Status.OK).build();
         }
     }
 

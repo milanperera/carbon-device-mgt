@@ -34,7 +34,7 @@ import java.util.Map;
 public class PermissionNode {
 
     private String pathName;
-    private List<Permission> permissions = new ArrayList<Permission>();
+    private Map<String, Permission> permissions = new HashMap<String, Permission>();
     private List<PermissionNode> children = new ArrayList<PermissionNode>();
 
     public PermissionNode(String pathName) {
@@ -67,12 +67,15 @@ public class PermissionNode {
         children.add(node);
     }
 
-    public void addPermission(Permission permission) {
-        permissions.add(permission);
+    public void addPermission(String httpMethod, Permission permission) {
+        permissions.put(httpMethod, permission);
     }
 
-    public List<Permission> getPermissions() {
-        return permissions;
+    public Permission getPermission(String httpMethod) {
+        return permissions.get(httpMethod);
     }
 
+    public Collection<Permission> getPermissions() {
+        return permissions.values();
+    }
 }

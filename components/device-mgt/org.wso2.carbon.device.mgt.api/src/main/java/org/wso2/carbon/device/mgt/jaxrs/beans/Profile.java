@@ -20,7 +20,6 @@ package org.wso2.carbon.device.mgt.jaxrs.beans;
 
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
-import org.wso2.carbon.device.mgt.core.dto.DeviceType;
 
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
@@ -40,7 +39,7 @@ public class Profile {
     private int tenantId;
     @ApiModelProperty(name = "deviceType", value = "Contains the device type details the policy was created "
             + "for", required = true)
-    private DeviceType deviceType;
+    private String deviceType;
     @ApiModelProperty(name = "createdDate", value = "The date the policy was created", required = true)
     private Timestamp createdDate;
     @ApiModelProperty(name = "updatedDate", value = "The date the changes made to the policy was published to"
@@ -50,11 +49,11 @@ public class Profile {
             + "in the policy", required = true)
     private List<ProfileFeature> profileFeaturesList;     // Features included in the policies.
 
-    public DeviceType getDeviceType() {
+    public String getDeviceType() {
         return deviceType;
     }
 
-    public void setDeviceType(DeviceType deviceType) {
+    public void setDeviceType(String deviceType) {
         this.deviceType = deviceType;
     }
     @XmlElement

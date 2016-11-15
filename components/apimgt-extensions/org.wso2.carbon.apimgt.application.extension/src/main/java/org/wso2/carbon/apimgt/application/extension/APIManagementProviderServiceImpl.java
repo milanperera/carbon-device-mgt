@@ -23,12 +23,7 @@ import org.apache.commons.logging.LogFactory;
 import org.json.simple.JSONObject;
 import org.wso2.carbon.apimgt.api.APIConsumer;
 import org.wso2.carbon.apimgt.api.APIManagementException;
-import org.wso2.carbon.apimgt.api.model.API;
-import org.wso2.carbon.apimgt.api.model.APIIdentifier;
-import org.wso2.carbon.apimgt.api.model.APIKey;
-import org.wso2.carbon.apimgt.api.model.Application;
-import org.wso2.carbon.apimgt.api.model.SubscribedAPI;
-import org.wso2.carbon.apimgt.api.model.Subscriber;
+import org.wso2.carbon.apimgt.api.model.*;
 import org.wso2.carbon.apimgt.application.extension.constants.ApiApplicationConstants;
 import org.wso2.carbon.apimgt.application.extension.dto.ApiApplicationKey;
 import org.wso2.carbon.apimgt.application.extension.exception.APIManagerException;
@@ -38,7 +33,6 @@ import org.wso2.carbon.apimgt.impl.APIManagerFactory;
 import org.wso2.carbon.utils.multitenancy.MultitenantConstants;
 import org.wso2.carbon.utils.multitenancy.MultitenantUtils;
 
-import java.util.Date;
 import java.util.Map;
 import java.util.Set;
 
@@ -164,14 +158,8 @@ public class APIManagementProviderServiceImpl implements APIManagementProviderSe
                     }
                 }
 
-                String[] allowedDomains = new String[1];
-                if (isAllowedAllDomains) {
-                    allowedDomains[0] = ApiApplicationConstants.ALLOWED_DOMAINS;
-                } else {
-                    allowedDomains[0] = APIManagerUtil.getTenantDomain();
-                }
                 apiConsumer.mapExistingOAuthClient(jsonString, username, clientId, applicationName,
-                                                   ApiApplicationConstants.DEFAULT_TOKEN_TYPE, allowedDomains);
+                                                   ApiApplicationConstants.DEFAULT_TOKEN_TYPE);
                 if (tags != null && tags.length > 0) {
                     createApplicationAndSubscribeToAPIs(applicationName, tags, username);
                 }
@@ -332,11 +320,7 @@ public class APIManagementProviderServiceImpl implements APIManagementProviderSe
             if (consumer != null) {
                 synchronized (consumer) {
                     if (consumer.getSubscriber(subscriberName) == null) {
-                        Subscriber subscriber = new Subscriber(subscriberName);
-                        subscriber.setSubscribedDate(new Date());
-                        subscriber.setEmail(subscriberEmail);
-                        subscriber.setTenantId(tenantId);
-                        consumer.addSubscriber(subscriber, groupId);
+                        consumer.addSubscriber(subscriberName, groupId);
                         if (log.isDebugEnabled()) {
                             log.debug("Successfully created subscriber with name : " + subscriberName +
                                               " with groupID : " + groupId);
@@ -370,7 +354,7 @@ public class APIManagementProviderServiceImpl implements APIManagementProviderSe
             Subscriber subscriber = apiConsumer.getSubscriber(username);
             Set<API> userVisibleAPIs = null;
             for (String tag : tags) {
-                Set<API> tagAPIs = apiConsumer.getAPIsWithTag(tag);
+                Set<API> tagAPIs = apiConsumer.getAPIsWithTag(tag, APIManagerUtil.getTenantDomain());
                 if (userVisibleAPIs == null) {
                     userVisibleAPIs = tagAPIs;
                 } else {
@@ -415,7 +399,7 @@ public class APIManagementProviderServiceImpl implements APIManagementProviderSe
             int applicationId = createApplication(apiConsumer, apiApplicationName, username, groupId);
             String tenantDomain = MultitenantUtils.getTenantDomain(username);
             Set<API> userVisibleAPIs = apiConsumer.getAllPublishedAPIs(tenantDomain);
-            if (!tenantDomain.equals(MultitenantConstants.SUPER_TENANT_DOMAIN_NAME)) {
+            if (!MultitenantConstants.SUPER_TENANT_DOMAIN_NAME.equals(tenantDomain)) {
                 userVisibleAPIs.addAll(apiConsumer.getAllPublishedAPIs(MultitenantConstants.SUPER_TENANT_DOMAIN_NAME));
             }
             Subscriber subscriber = apiConsumer.getSubscriber(username);
@@ -443,7 +427,7 @@ public class APIManagementProviderServiceImpl implements APIManagementProviderSe
         try {
             APIConsumer apiConsumer = APIManagerFactory.getInstance().getAPIConsumer(username);
             loginInfoJsonObj.put("user", username);
-            if (tenantDomain.equals(MultitenantConstants.SUPER_TENANT_DOMAIN_NAME)) {
+            if (MultitenantConstants.SUPER_TENANT_DOMAIN_NAME.equals(tenantDomain)) {
                 loginInfoJsonObj.put("isSuperTenant", true);
             } else {
                 loginInfoJsonObj.put("isSuperTenant", false);

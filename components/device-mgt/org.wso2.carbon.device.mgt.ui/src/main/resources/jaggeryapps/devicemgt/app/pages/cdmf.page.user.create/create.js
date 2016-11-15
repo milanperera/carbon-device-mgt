@@ -18,25 +18,37 @@
 
 /**
  * Returns the dynamic state to be populated by add-user page.
- *
- * @param context Object that gets updated with the dynamic state of this page to be presented
  * @returns {*} A context object that returns the dynamic state of this page to be presented
  */
-function onRequest(context) {
-    var userModule = require("/app/modules/user.js")["userModule"];
-    var response = userModule.getRolesByUserStore("PRIMARY");
-    var devicemgtProps = require('/app/conf/devicemgt-props.js').config();
+function onRequest() {
+    //var log = new Log("/app/pages/cdmf.page.user.create server-side js");
+
+    var userModule = require("/app/modules/business-controllers/user.js")["userModule"];
+    var devicemgtProps = require("/app/modules/conf-reader/main.js")["conf"];
+   
     var page = {};
-    page["charLimit"] = devicemgtProps.usernameLength;
+    var response = userModule.getRolesByUserStore("PRIMARY");
     if (response["status"] == "success") {
         page["roles"] = response["content"];
     }
-    page["usernameJSRegEx"] = devicemgtProps.userValidationConfig.usernameJSRegEx;
-    page["usernameHelpMsg"] = devicemgtProps.userValidationConfig.usernameHelpMsg;
-    page["usernameRegExViolationErrorMsg"] = devicemgtProps.userValidationConfig.usernameRegExViolationErrorMsg;
-    page["firstnameJSRegEx"] = devicemgtProps.userValidationConfig.firstnameJSRegEx;
-    page["firstnameRegExViolationErrorMsg"] = devicemgtProps.userValidationConfig.firstnameRegExViolationErrorMsg;
-    page["lastnameJSRegEx"] = devicemgtProps.userValidationConfig.lastnameJSRegEx;
-    page["lastnameRegExViolationErrorMsg"] = devicemgtProps.userValidationConfig.lastnameRegExViolationErrorMsg;
+
+    if (userModule.isAuthorized("/permission/admin/device-mgt/users/manage")) {
+        page.canManage = true;
+    }
+    if (userModule.isAuthorized("/permission/admin/device-mgt/roles/view")) {
+        page.canViewRoles = true;
+    }
+    var userStores = userModule.getSecondaryUserStores();
+    page["userStores"] = userStores;
+    page["charLimit"] = devicemgtProps["usernameLength"];
+    page["usernameJSRegEx"] = devicemgtProps["userValidationConfig"]["usernameJSRegEx"];
+    page["usernameHelpMsg"] = devicemgtProps["userValidationConfig"]["usernameHelpMsg"];
+    page["usernameRegExViolationErrorMsg"] = devicemgtProps["userValidationConfig"]["usernameRegExViolationErrorMsg"];
+    page["firstnameJSRegEx"] = devicemgtProps["userValidationConfig"]["firstnameJSRegEx"];
+    page["firstnameRegExViolationErrorMsg"] = devicemgtProps["userValidationConfig"]["firstnameRegExViolationErrorMsg"];
+    page["lastnameJSRegEx"] = devicemgtProps["userValidationConfig"]["lastnameJSRegEx"];
+    page["lastnameRegExViolationErrorMsg"] = devicemgtProps["userValidationConfig"]["lastnameRegExViolationErrorMsg"];
+    page["enrollmentURL"] = devicemgtProps["generalConfig"]["host"] + devicemgtProps["enrollmentDir"];
+
     return page;
 }

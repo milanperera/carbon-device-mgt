@@ -17,14 +17,12 @@
   ~ under the License.
   -->
 
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 
     <parent>
         <artifactId>certificate-mgt</artifactId>
         <groupId>org.wso2.carbon.devicemgt</groupId>
-        <version>1.1.1-SNAPSHOT</version>
+        <version>1.2.7-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -72,10 +70,9 @@
                                 </goals>
                                 <configuration>
                                     <tasks>
-                                        <copy todir="${basedir}/../../../repository/deployment/server/webapps"
-                                              overwrite="true">
+                                        <copy todir="${basedir}/../../../repository/deployment/server/webapps" overwrite="true">
                                             <fileset dir="${basedir}/target">
-                                                <include name="api#certificate-mgt#v1.0.war"/>
+                                                <include name="api#certificate-mgt#v1.0.war" />
                                             </fileset>
                                         </copy>
                                     </tasks>
@@ -149,26 +146,6 @@
         </dependency>
         <dependency>
             <groupId>org.wso2.carbon.devicemgt</groupId>
-            <artifactId>org.wso2.carbon.device.mgt.common</artifactId>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.wso2.carbon.devicemgt</groupId>
-            <artifactId>org.wso2.carbon.device.mgt.core</artifactId>
-            <scope>provided</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.apache.axis2.wso2</groupId>
-                    <artifactId>axis2-client</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.apache.neethi.wso2</groupId>
-                    <artifactId>neethi</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>org.wso2.carbon.devicemgt</groupId>
             <artifactId>org.wso2.carbon.certificate.mgt.core</artifactId>
             <scope>provided</scope>
         </dependency>
@@ -189,6 +166,12 @@
         <dependency>
             <groupId>io.swagger</groupId>
             <artifactId>swagger-jaxrs</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>javax.servlet</groupId>

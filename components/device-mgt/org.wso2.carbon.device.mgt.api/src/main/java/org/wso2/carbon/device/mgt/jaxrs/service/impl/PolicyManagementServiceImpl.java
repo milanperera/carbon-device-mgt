@@ -28,23 +28,25 @@ import org.wso2.carbon.device.mgt.common.authorization.DeviceAccessAuthorization
 import org.wso2.carbon.device.mgt.common.authorization.DeviceAccessAuthorizationService;
 import org.wso2.carbon.device.mgt.core.internal.DeviceManagementDataHolder;
 import org.wso2.carbon.device.mgt.jaxrs.beans.ErrorResponse;
-import org.wso2.carbon.device.mgt.jaxrs.beans.PolicyWrapper;
-import org.wso2.carbon.device.mgt.jaxrs.service.api.PolicyManagementService;
-import org.wso2.carbon.device.mgt.jaxrs.service.impl.util.*;
-import org.wso2.carbon.device.mgt.jaxrs.service.impl.util.NotFoundException;
 import org.wso2.carbon.device.mgt.jaxrs.beans.PolicyList;
+import org.wso2.carbon.device.mgt.jaxrs.beans.PolicyWrapper;
+import org.wso2.carbon.device.mgt.jaxrs.beans.PriorityUpdatedPolicyWrapper;
+import org.wso2.carbon.device.mgt.jaxrs.service.api.PolicyManagementService;
 import org.wso2.carbon.device.mgt.jaxrs.service.impl.util.FilteringUtil;
+import org.wso2.carbon.device.mgt.jaxrs.service.impl.util.RequestValidationUtil;
 import org.wso2.carbon.device.mgt.jaxrs.util.DeviceMgtAPIUtils;
 import org.wso2.carbon.device.mgt.jaxrs.util.DeviceMgtUtil;
 import org.wso2.carbon.policy.mgt.common.Policy;
 import org.wso2.carbon.policy.mgt.common.PolicyAdministratorPoint;
 import org.wso2.carbon.policy.mgt.common.PolicyManagementException;
 import org.wso2.carbon.policy.mgt.core.PolicyManagerService;
-import org.wso2.carbon.device.mgt.jaxrs.beans.PriorityUpdatedPolicyWrapper;
 
+import javax.validation.Valid;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -53,11 +55,12 @@ import java.util.List;
 @Consumes(MediaType.APPLICATION_JSON)
 public class PolicyManagementServiceImpl implements PolicyManagementService {
 
+    private static final String API_BASE_PATH = "/policies";
     private static final Log log = LogFactory.getLog(PolicyManagementServiceImpl.class);
 
     @POST
     @Override
-    public Response addPolicy(PolicyWrapper policyWrapper) {
+    public Response addPolicy(@Valid PolicyWrapper policyWrapper) {
         RequestValidationUtil.validatePolicyDetails(policyWrapper);
         PolicyManagerService policyManagementService = DeviceMgtAPIUtils.getPolicyManagementService();
 
@@ -74,35 +77,42 @@ public class PolicyManagementServiceImpl implements PolicyManagementService {
                 String username = threadLocalCarbonContext.getUsername();
                 try {
                     if (!deviceAccessAuthorizationService.isUserAuthorized(deviceIdentifier, username)) {
-                        throw new UnauthorizedAccessException(
-                                new ErrorResponse.ErrorResponseBuilder().setCode(401l).setMessage
-                                        ("Current logged in user is not authorized to add policies").build());
+                        return Response.status(Response.Status.UNAUTHORIZED).entity(
+                                new ErrorResponse.ErrorResponseBuilder().setMessage
+                                        ("Current logged in user is not authorized to add policies").build()).build();
                     }
                 } catch (DeviceAccessAuthorizationException e) {
-                    String msg = "ErrorResponse occurred while checking if the current user is authorized to add a policy";
+                    String msg = "Error occurred while checking if the current user is authorized to add a policy";
                     log.error(msg, e);
-                    throw new UnexpectedServerErrorException(
-                            new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build());
+                    return Response.serverError().entity(
+                            new ErrorResponse.ErrorResponseBuilder().setMessage(msg).build()).build();
                 }
             }
 
             PolicyAdministratorPoint pap = policyManagementService.getPAP();
-            pap.addPolicy(policy);
-            return Response.status(Response.Status.CREATED).entity("Policy has been added successfully").build();
+            Policy createdPolicy = pap.addPolicy(policy);
+
+            return Response.created(new URI(API_BASE_PATH + "/" + createdPolicy.getId())).entity(createdPolicy).build();
         } catch (PolicyManagementException e) {
-            String msg = "ErrorResponse occurred while adding policy";
+            String msg = "Error occurred while adding policy";
             log.error(msg, e);
-            throw new UnexpectedServerErrorException(
-                    new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build());
+            return Response.serverError().entity(
+                    new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build()).build();
         } catch (DeviceManagementException e) {
-            String msg = "ErrorResponse occurred while retrieving device list.";
+            String msg = "Error occurred while retrieving device list.";
             log.error(msg, e);
-            throw new UnexpectedServerErrorException(
-                    new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build());
+            return Response.serverError().entity(
+                    new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build()).build();
+        } catch (URISyntaxException e) {
+            String msg = "Error occurred while composing the location URI, which represents information of the " +
+                    "newly created policy";
+            log.error(msg, e);
+            return Response.serverError().entity(
+                    new ErrorResponse.ErrorResponseBuilder().setMessage(msg).build()).build();
         }
     }
 
-    private Policy getPolicyFromWrapper(PolicyWrapper policyWrapper) throws DeviceManagementException {
+    private Policy getPolicyFromWrapper(@Valid PolicyWrapper policyWrapper) throws DeviceManagementException {
         Policy policy = new Policy();
         policy.setPolicyName(policyWrapper.getPolicyName());
         policy.setDescription(policyWrapper.getDescription());
@@ -113,7 +123,7 @@ public class PolicyManagementServiceImpl implements PolicyManagementService {
         policy.setUsers(policyWrapper.getUsers());
         policy.setCompliance(policyWrapper.getCompliance());
         //TODO iterates the device identifiers to create the object. need to implement a proper DAO layer here.
-        List<Device> devices = null;
+        List<Device> devices = new ArrayList<Device>();
         List<DeviceIdentifier> deviceIdentifiers = policyWrapper.getDeviceIdentifiers();
         if (deviceIdentifiers != null) {
             for (DeviceIdentifier id : deviceIdentifiers) {
@@ -131,6 +141,7 @@ public class PolicyManagementServiceImpl implements PolicyManagementService {
             @HeaderParam("If-Modified-Since") String ifModifiedSince,
             @QueryParam("offset") int offset,
             @QueryParam("limit") int limit) {
+        RequestValidationUtil.validatePaginationParameters(offset, limit);
         PolicyManagerService policyManagementService = DeviceMgtAPIUtils.getPolicyManagementService();
         List<Policy> policies;
         List<Policy> filteredPolicies;
@@ -138,21 +149,14 @@ public class PolicyManagementServiceImpl implements PolicyManagementService {
         try {
             PolicyAdministratorPoint policyAdministratorPoint = policyManagementService.getPAP();
             policies = policyAdministratorPoint.getPolicies();
-            if (policies == null || policies.size() == 0) {
-                throw new NotFoundException(
-                        new ErrorResponse.ErrorResponseBuilder().setCode(404l).setMessage("No policies found.").build());
-            }
             targetPolicies.setCount(policies.size());
             filteredPolicies = FilteringUtil.getFilteredList(policies, offset, limit);
-            if (filteredPolicies.size() == 0) {
-                return Response.status(Response.Status.NOT_FOUND).entity("No policies found.").build();
-            }
             targetPolicies.setList(filteredPolicies);
         } catch (PolicyManagementException e) {
-            String msg = "ErrorResponse occurred while retrieving all available policies";
+            String msg = "Error occurred while retrieving all available policies";
             log.error(msg, e);
-            throw new UnexpectedServerErrorException(
-                    new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build());
+            return Response.serverError().entity(
+                    new ErrorResponse.ErrorResponseBuilder().setMessage(msg).build()).build();
         }
 
         return Response.status(Response.Status.OK).entity(targetPolicies).build();
@@ -168,14 +172,15 @@ public class PolicyManagementServiceImpl implements PolicyManagementService {
             PolicyAdministratorPoint policyAdministratorPoint = policyManagementService.getPAP();
             policy = policyAdministratorPoint.getPolicy(id);
             if (policy == null) {
-                throw new NotFoundException(
-                        new ErrorResponse.ErrorResponseBuilder().setCode(404l).setMessage("No policy found.").build());
+                return Response.status(Response.Status.NOT_FOUND).entity(
+                        new ErrorResponse.ErrorResponseBuilder().setMessage(
+                                "No policy found with the id '" + id + "'").build()).build();
             }
         } catch (PolicyManagementException e) {
-            String msg = "ErrorResponse occurred while retrieving policy corresponding to the id '" + id + "'";
+            String msg = "Error occurred while retrieving policy corresponding to the id '" + id + "'";
             log.error(msg, e);
-            throw new UnexpectedServerErrorException(
-                    new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build());
+            return Response.serverError().entity(
+                    new ErrorResponse.ErrorResponseBuilder().setMessage(msg).build()).build();
         }
         return Response.status(Response.Status.OK).entity(policy).build();
     }
@@ -183,29 +188,29 @@ public class PolicyManagementServiceImpl implements PolicyManagementService {
     @PUT
     @Path("/{id}")
     @Override
-    public Response updatePolicy(@PathParam("id") int id, PolicyWrapper policyWrapper) {
+    public Response updatePolicy(@PathParam("id") int id, @Valid PolicyWrapper policyWrapper) {
         RequestValidationUtil.validatePolicyDetails(policyWrapper);
         PolicyManagerService policyManagementService = DeviceMgtAPIUtils.getPolicyManagementService();
         try {
             Policy policy = this.getPolicyFromWrapper(policyWrapper);
             policy.setId(id);
             PolicyAdministratorPoint pap = policyManagementService.getPAP();
-            Policy exisitingPolicy = pap.getPolicy(id);
-            if (exisitingPolicy == null) {
+            Policy existingPolicy = pap.getPolicy(id);
+            if (existingPolicy == null) {
                 return Response.status(Response.Status.NOT_FOUND).entity("Policy not found.").build();
             }
             pap.updatePolicy(policy);
             return Response.status(Response.Status.OK).entity("Policy has successfully been updated.").build();
         } catch (PolicyManagementException e) {
-            String msg = "ErrorResponse occurred while updating the policy";
+            String msg = "Error occurred while updating the policy";
             log.error(msg, e);
-            throw new UnexpectedServerErrorException(
-                    new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build());
+            return Response.serverError().entity(
+                    new ErrorResponse.ErrorResponseBuilder().setMessage(msg).build()).build();
         } catch (DeviceManagementException e) {
-            String msg = "ErrorResponse occurred while retrieving the device list.";
+            String msg = "Error occurred while retrieving the device list.";
             log.error(msg, e);
-            throw new UnexpectedServerErrorException(
-                    new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build());
+            return Response.serverError().entity(
+                    new ErrorResponse.ErrorResponseBuilder().setMessage(msg).build()).build();
         }
     }
 
@@ -216,30 +221,43 @@ public class PolicyManagementServiceImpl implements PolicyManagementService {
         RequestValidationUtil.validatePolicyIds(policyIds);
         PolicyManagerService policyManagementService = DeviceMgtAPIUtils.getPolicyManagementService();
         boolean policyDeleted = true;
+        String invalidPolicyIds = "";
         try {
             PolicyAdministratorPoint pap = policyManagementService.getPAP();
             for (int i : policyIds) {
                 Policy policy = pap.getPolicy(i);
-                if (policy == null || !pap.deletePolicy(policy)) {
+                if (policy == null) {
+                    invalidPolicyIds += i + ",";
                     policyDeleted = false;
+                }
+            }
+            if (policyDeleted) {
+                for (int i : policyIds) {
+                    Policy policy = pap.getPolicy(i);
+                    pap.deletePolicy(policy);
                 }
             }
         } catch (PolicyManagementException e) {
             String msg = "ErrorResponse occurred while removing policies";
             log.error(msg, e);
-            throw new UnexpectedServerErrorException(
-                    new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build());
+            return Response.serverError().entity(
+                    new ErrorResponse.ErrorResponseBuilder().setMessage(msg).build()).build();
         }
         if (policyDeleted) {
-            return Response.status(Response.Status.OK).entity("Policies have been successfully deleted").build();
+            return Response.status(Response.Status.OK).entity("Policies have been successfully " +
+                                                              "deleted").build();
         } else {
             //TODO:Check of this logic is correct
-            throw new NotFoundException(
-                    new ErrorResponse.ErrorResponseBuilder().setCode(404l).setMessage("Policy doesn't exist").build());
+            String modifiedInvalidPolicyIds =
+                    invalidPolicyIds.substring(0, invalidPolicyIds.length() - 1);
+            return Response.status(Response.Status.BAD_REQUEST).
+                    entity(new ErrorResponse.ErrorResponseBuilder().
+                            setMessage("Policies with the policy ID " + modifiedInvalidPolicyIds +
+                                       " doesn't exist").build()).build();
         }
     }
 
-    @PUT
+    @POST
     @Path("/activate-policy")
     @Override
     public Response activatePolicies(List<Integer> policyIds) {
@@ -256,22 +274,22 @@ public class PolicyManagementServiceImpl implements PolicyManagementService {
                 }
             }
         } catch (PolicyManagementException e) {
-            String msg = "ErrorResponse occurred while activating policies";
+            String msg = "Error occurred while activating policies";
             log.error(msg, e);
-            throw new UnexpectedServerErrorException(
-                    new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build());
+            return Response.serverError().entity(
+                    new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build()).build();
         }
         if (isPolicyActivated) {
             return Response.status(Response.Status.OK).entity("Selected policies have been successfully activated")
                     .build();
         } else {
-            throw new NotFoundException(
-                    new ErrorResponse.ErrorResponseBuilder().setCode(404l).setMessage("Selected policies have " +
-                            "not been activated").build());
+            return Response.status(Response.Status.NOT_FOUND).entity(
+                    new ErrorResponse.ErrorResponseBuilder().setMessage("Selected policies have " +
+                            "not been activated").build()).build();
         }
     }
 
-    @PUT
+    @POST
     @Path("/deactivate-policy")
     @Override
     public Response deactivatePolicies(List<Integer> policyIds) {
@@ -290,16 +308,16 @@ public class PolicyManagementServiceImpl implements PolicyManagementService {
         } catch (PolicyManagementException e) {
             String msg = "Exception in inactivating policies.";
             log.error(msg, e);
-            throw new UnexpectedServerErrorException(
-                    new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build());
+            return Response.serverError().entity(
+                    new ErrorResponse.ErrorResponseBuilder().setMessage(msg).build()).build();
         }
         if (isPolicyDeActivated) {
             return Response.status(Response.Status.OK).entity("Selected policies have been successfully " +
-                                                                      "deactivated").build();
+                    "deactivated").build();
         } else {
-            throw new NotFoundException(
-                    new ErrorResponse.ErrorResponseBuilder().setCode(404l).setMessage("Selected policies have " +
-                            "not been deactivated").build());
+            return Response.status(Response.Status.NOT_FOUND).entity(
+                    new ErrorResponse.ErrorResponseBuilder().setMessage("Selected policies have " +
+                            "not been deactivated").build()).build();
         }
     }
 
@@ -315,8 +333,8 @@ public class PolicyManagementServiceImpl implements PolicyManagementService {
         } catch (PolicyManagementException e) {
             String msg = "Exception in applying changes.";
             log.error(msg, e);
-            throw new UnexpectedServerErrorException(
-                    new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build());
+            return Response.serverError().entity(
+                    new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build()).build();
         }
         return Response.status(Response.Status.OK).entity("Changes have been successfully updated.").build();
     }
@@ -340,17 +358,17 @@ public class PolicyManagementServiceImpl implements PolicyManagementService {
         } catch (PolicyManagementException e) {
             String error = "Exception in updating policy priorities.";
             log.error(error, e);
-            throw new UnexpectedServerErrorException(
-                    new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(error).build());
+            return Response.serverError().entity(
+                    new ErrorResponse.ErrorResponseBuilder().setMessage(error).build()).build();
         }
         if (policiesUpdated) {
             return Response.status(Response.Status.OK).entity("Policy Priorities successfully "
                     + "updated.").build();
 
         } else {
-            throw new NotFoundException(
+            return Response.status(Response.Status.NOT_FOUND).entity(
                     new ErrorResponse.ErrorResponseBuilder().setCode(400l).setMessage("Policy priorities did "
-                            + "not update. Bad Request.").build());
+                            + "not update. Bad Request.").build()).build();
         }
     }
 

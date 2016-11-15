@@ -35,6 +35,7 @@ import org.wso2.carbon.device.mgt.core.dao.DeviceManagementDAOFactory;
 import org.wso2.carbon.device.mgt.core.notification.mgt.dao.NotificationDAO;
 import org.wso2.carbon.device.mgt.core.notification.mgt.dao.NotificationManagementDAOFactory;
 import org.wso2.carbon.device.mgt.core.notification.mgt.dao.util.NotificationDAOUtil;
+import org.wso2.carbon.device.mgt.core.util.DeviceManagerUtil;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -161,9 +162,23 @@ public class NotificationManagementServiceImpl implements NotificationManagement
     }
 
     @Override
+    public Notification getNotification(int notificationId) throws NotificationManagementException {
+        try {
+            NotificationManagementDAOFactory.openConnection();
+            return notificationDAO.getNotification(NotificationDAOUtil.getTenantId(), notificationId);
+        } catch (SQLException e) {
+            throw new NotificationManagementException("Error occurred while opening a connection to" +
+                    " the data source", e);
+        } finally {
+            NotificationManagementDAOFactory.closeConnection();
+        }
+    }
+
+    @Override
     public PaginationResult getAllNotifications(PaginationRequest request) throws NotificationManagementException {
         PaginationResult paginationResult = new PaginationResult();
         List<Notification> notifications = new ArrayList<>();
+        request = DeviceManagerUtil.validateNotificationListPageSize(request);
         int count =0;
         try {
             NotificationManagementDAOFactory.openConnection();
@@ -186,6 +201,7 @@ public class NotificationManagementServiceImpl implements NotificationManagement
                                                      PaginationRequest request) throws NotificationManagementException{
         PaginationResult paginationResult = new PaginationResult();
         List<Notification> notifications = new ArrayList<>();
+        request = DeviceManagerUtil.validateNotificationListPageSize(request);
         int count =0;
         try {
             NotificationManagementDAOFactory.openConnection();

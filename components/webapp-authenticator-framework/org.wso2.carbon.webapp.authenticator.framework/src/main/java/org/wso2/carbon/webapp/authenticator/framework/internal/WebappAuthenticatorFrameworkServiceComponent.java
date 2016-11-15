@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) 2015, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
+ *   Copyright (c) 2016, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
  *
  *   WSO2 Inc. licenses this file to you under the Apache License,
  *   Version 2.0 (the "License"); you may not use this file except
@@ -16,14 +16,15 @@
  *   under the License.
  *
  */
+
 package org.wso2.carbon.webapp.authenticator.framework.internal;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.osgi.framework.BundleContext;
 import org.osgi.service.component.ComponentContext;
+import org.wso2.carbon.certificate.mgt.core.scep.SCEPManager;
 import org.wso2.carbon.certificate.mgt.core.service.CertificateManagementService;
-import org.wso2.carbon.device.mgt.core.scep.SCEPManager;
 import org.wso2.carbon.identity.oauth2.OAuth2TokenValidationService;
 import org.wso2.carbon.registry.core.service.TenantRegistryLoader;
 import org.wso2.carbon.registry.indexing.service.TenantIndexingLoader;
@@ -57,8 +58,8 @@ import java.util.Properties;
  * cardinality="1..n"
  * bind="setCertificateManagementService"
  * unbind="unsetCertificateManagementService"
- * @scr.reference name="org.wso2.carbon.device.mgt.core.scep"
- * interface="org.wso2.carbon.device.mgt.core.scep.SCEPManager"
+ * @scr.reference name="org.wso2.carbon.certificate.mgt.core.scep"
+ * interface="org.wso2.carbon.certificate.mgt.core.scep.SCEPManager"
  * policy="dynamic"
  * cardinality="1..n"
  * bind="setSCEPManagementService"
@@ -82,7 +83,6 @@ import java.util.Properties;
  * unbind="unsetTenantRegistryLoader"
  */
 public class WebappAuthenticatorFrameworkServiceComponent {
-
     private static final Log log = LogFactory.getLog(WebappAuthenticatorFrameworkServiceComponent.class);
 
     @SuppressWarnings("unused")

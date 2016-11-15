@@ -18,57 +18,60 @@
 
 function onRequest(context) {
     var constants = require("/app/modules/constants.js");
-    var userModule = require("/app/modules/user.js").userModule;
-    var deviceModule = require("/app/modules/device.js").deviceModule;
+    var userModule = require("/app/modules/business-controllers/user.js")["userModule"];
+    var deviceModule = require("/app/modules/business-controllers/device.js")["deviceModule"];
 
     var groupName = request.getParameter("groupName");
     var groupOwner = request.getParameter("groupOwner");
 
-    var page = {};
+    var viewModel = {};
     var title = "Devices";
     if (groupName) {
         title = groupName + " " + title;
-        page.groupName = groupName;
+        viewModel.groupName = groupName;
     }
-    page.title = title;
+    viewModel.title = title;
     var currentUser = session.get(constants.USER_SESSION_KEY);
     if (currentUser) {
-        page.permissions = {};
+        viewModel.permissions = {};
         var uiPermissions = userModule.getUIPermissions();
-        page.permissions.list = stringify(uiPermissions);
+        viewModel.permissions.list = stringify(uiPermissions);
         if (uiPermissions.ADD_DEVICE) {
-            page.permissions.enroll = true;
+            viewModel.permissions.enroll = true;
         }
-        page.currentUser = currentUser;
+        viewModel.currentUser = currentUser;
         var deviceCount = 0;
         if (groupName && groupOwner) {
-            var groupModule = require("/app/modules/group.js").groupModule;
+            var groupModule = require("/app/modules/business-controllers/group.js")["groupModule"];
             deviceCount = groupModule.getGroupDeviceCount(groupName, groupOwner);
         } else {
             deviceCount = deviceModule.getDevicesCount();
         }
         if (deviceCount > 0) {
-            page.deviceCount = deviceCount;
+            viewModel.deviceCount = deviceCount;
             var utility = require("/app/modules/utility.js").utility;
-            var data = deviceModule.getDeviceTypes();
+            var typesListResponse = deviceModule.getDeviceTypes();
             var deviceTypes = [];
-            if (data) {
-                for (var i = 0; i < data.length; i++) {
-                    var config = utility.getDeviceTypeConfig(data[i].name);
-                    if (!config){
-                        continue;
+            if (typesListResponse["status"] == "success") {
+                var data = typesListResponse.content.deviceTypes;
+                if (data) {
+                    for (var i = 0; i < data.length; i++) {
+                        var config = utility.getDeviceTypeConfig(data[i]);
+                        if (!config) {
+                            continue;
+                        }
+                        var deviceType = config.deviceType;
+                        deviceTypes.push({
+                                             "type": data[i],
+                                             "category": deviceType.category,
+                                             "label": deviceType.label,
+                                             "thumb": utility.getDeviceThumb(data[i])
+                                         });
                     }
-                    var deviceType = config.deviceType;
-                    deviceTypes.push({
-                        "type": data[i].name,
-                        "category": deviceType.category,
-                        "label": deviceType.label,
-                        "thumb": utility.getDeviceThumb(data[i].name)
-                    });
                 }
             }
-            page.deviceTypes = stringify(deviceTypes);
+            viewModel.deviceTypes = stringify(deviceTypes);
         }
     }
-    return page;
+    return viewModel;
 }

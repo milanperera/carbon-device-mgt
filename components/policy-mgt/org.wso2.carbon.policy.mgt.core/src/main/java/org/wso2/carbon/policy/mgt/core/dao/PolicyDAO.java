@@ -31,7 +31,7 @@ public interface PolicyDAO {
 
     Policy addPolicy(Policy policy) throws PolicyManagerDAOException;
 
-    Policy addPolicy(String deviceType, Policy policy) throws PolicyManagerDAOException;
+//    Policy addPolicyToDeviceType(String deviceType, Policy policy) throws PolicyManagerDAOException;
 
     /**
      * This method is used to add/update the roles associated with the policy.
@@ -136,6 +136,8 @@ public interface PolicyDAO {
 
     void updateEffectivePolicyToDevice(int deviceId, int enrolmentId, Policy policy)
             throws PolicyManagerDAOException;
+
+    void deleteEffectivePolicyToDevice(int deviceId, int enrolmentId) throws PolicyManagerDAOException;
 
     boolean checkPolicyAvailable(int deviceId, int enrollmentId) throws PolicyManagerDAOException;
 

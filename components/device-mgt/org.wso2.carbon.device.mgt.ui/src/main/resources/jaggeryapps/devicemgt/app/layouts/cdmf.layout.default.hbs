@@ -1,64 +1,80 @@
+{{!-- Copyright (c) 2015, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
+
+WSO2 Inc. licenses this file to you under the Apache License,
+Version 2.0 (the "License"); you may not use this file except
+in compliance with the License.
+You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+either express or implied. See the License for the
+specific language governing permissions and limitations
+under the License. --}}
+
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        {{defineZone "favicon"}}
+        <title>
+            {{defineZone "title"}}
+        </title>
+        {{defineZone "topLibCss"}}
+        {{defineZone "topCss"}}
+        {{defineZone "topJs"}}
+    </head>
+    <body>
+        <!--modal-->
+        <div class="modal fade" tabindex="-1" role="dialog" aria-labelledby="modalDemo">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content clearfix">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><i class="fw fw-cancel"></i></button>
+                    </div>
+                    <div class="modal-body add-margin-top-2x add-margin-bottom-2x">
 
-    <title>{{#defineZone "title"}}WSO2 Template{{/defineZone}}</title>
-    {{defineZone "favicon"}}
-    {{defineZone "topCss"}}
-    {{defineZone "topJs"}}
-</head>
-<body>
-
-<!--modal-->
-<div class="wr-modalpopup">
-    <div class="modalpopup-container">
-        <div class="modalpopup-close-btn" onclick="hidePopup();">
-            <span class="fw-stack">
-                <i class="fw fw-ring fw-stack-2x"></i>
-                <i class="fw fw-left-arrow fw-stack-1x"></i>
-            </span>
-            GO BACK
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="modalpopup-content"><!-- dynamic content --></div>
-    </div>
-    <div class="modalpopup-bg"></div>
-</div>
-<!--modal-->
 
-<!-- header -->
-{{defineZone "header"}}
-<!-- /header -->
+        <!--modal-->
 
-<!-- navbars -->
-<div class="navbar-wrapper">
-    {{defineZone "navbars"}}
-</div>
-<!-- /navbars -->
+        {{defineZone "header"}}
 
-<!-- sidepanes -->
-{{defineZone "sidePanes"}}
-<!-- /sidepanes -->
+        <div class="navbar-wrapper">
+            {{defineZone "navbars"}}
+        </div>
 
-<!-- page-content-wrapper -->
-<div class="page-content-wrapper">
-    {{defineZone "contentTitle"}}
-    <div class="container-fluid body-wrapper">
-        {{defineZone "content"}}
-    </div>
-</div>
-<!-- /page-content-wrapper -->
+        {{defineZone "sidePanes"}}
 
-<!-- footer -->
-<footer class="footer">
-    <div class="container-fluid">
-        {{defineZone "footer"}}
-    </div>
-</footer>
-<!-- /footer -->
+        <!-- page-content-wrapper -->
+        <div class="page-content-wrapper">
+            {{defineZone "contentTitle"}}
+            <div class="container-fluid ">
+                <div class="body-wrapper">
+                    {{defineZone "content"}}
+                </div>
+            </div>
+        </div>
+        <!-- /page-content-wrapper -->
 
-{{defineZone "bottomJs"}}
-</body>
+        <footer class="footer">
+            <div class="container-fluid">
+                {{defineZone "footer"}}
+            </div>
+        </footer>
+
+        {{defineZone "bottomModalContent"}}
+        {{defineZone "bottomLibJs"}}
+        {{defineZone "bottomJs"}}
+    </body>
 </html>

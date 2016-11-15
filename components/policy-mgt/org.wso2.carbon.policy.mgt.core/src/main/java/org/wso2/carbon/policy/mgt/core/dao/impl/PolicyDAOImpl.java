@@ -48,25 +48,25 @@ public class PolicyDAOImpl implements PolicyDAO {
         return persistPolicy(policy);
     }
 
-    @Override
-    public Policy addPolicy(String deviceType, Policy policy) throws PolicyManagerDAOException {
-        Connection conn;
-        PreparedStatement stmt = null;
-        try {
-            conn = this.getConnection();
-            String query = "INSERT INTO DM_DEVICE_TYPE_POLICY (DEVICE_TYPE_ID, POLICY_ID) VALUES (?, ?)";
-            stmt = conn.prepareStatement(query);
-            stmt.setInt(1, getDeviceTypeId(deviceType));
-            stmt.setInt(2, policy.getId());
-            stmt.executeQuery();
-        } catch (SQLException e) {
-            throw new PolicyManagerDAOException("Error occurred while adding the device type policy to database.", e);
-        } finally {
-            PolicyManagementDAOUtil.cleanupResources(stmt, null);
-        }
-        return policy;
-
-    }
+//    @Override
+//    public Policy addPolicyToDeviceType(String deviceType, Policy policy) throws PolicyManagerDAOException {
+//        Connection conn;
+//        PreparedStatement stmt = null;
+//        try {
+//            conn = this.getConnection();
+//            String query = "INSERT INTO DM_DEVICE_TYPE_POLICY (DEVICE_TYPE_ID, POLICY_ID) VALUES (?, ?)";
+//            stmt = conn.prepareStatement(query);
+//            stmt.setInt(1, getDeviceTypeId(deviceType));
+//            stmt.setInt(2, policy.getId());
+//            stmt.executeQuery();
+//        } catch (SQLException e) {
+//            throw new PolicyManagerDAOException("Error occurred while adding the device type policy to database.", e);
+//        } finally {
+//            PolicyManagementDAOUtil.cleanupResources(stmt, null);
+//        }
+//        return policy;
+//
+//    }
 
     @Override
     public Policy addPolicyToRole(List<String> rolesToAdd, Policy policy) throws PolicyManagerDAOException {
@@ -473,8 +473,8 @@ public class PolicyDAOImpl implements PolicyDAO {
         try {
             conn = this.getConnection();
             String query = "SELECT * FROM DM_POLICY_CHANGE_MGT WHERE TENANT_ID = ?";
-            stmt.setInt(1, tenantId);
             stmt = conn.prepareStatement(query);
+            stmt.setInt(1, tenantId);
             resultSet = stmt.executeQuery();
 
             while (resultSet.next()) {
@@ -831,10 +831,10 @@ public class PolicyDAOImpl implements PolicyDAO {
         int tenantId = PrivilegedCarbonContext.getThreadLocalCarbonContext().getTenantId();
         try {
             conn = this.getConnection();
-            String query = "INSERT INTO DM_POLICY_CHANGE_MGT (POLICY_ID, DEVICE_TYPE_ID, TENANT_ID) VALUES (?, ?, ?)";
+            String query = "INSERT INTO DM_POLICY_CHANGE_MGT (POLICY_ID, DEVICE_TYPE, TENANT_ID) VALUES (?, ?, ?)";
             stmt = conn.prepareStatement(query);
             stmt.setInt(1, policy.getId());
-            stmt.setInt(2, policy.getProfile().getDeviceType().getId());
+            stmt.setString(2, policy.getProfile().getDeviceType());
             stmt.setInt(3, tenantId);
             stmt.executeUpdate();
 
@@ -855,11 +855,11 @@ public class PolicyDAOImpl implements PolicyDAO {
         int tenantId = PrivilegedCarbonContext.getThreadLocalCarbonContext().getTenantId();
         try {
             conn = this.getConnection();
-            String query = "INSERT INTO DM_POLICY_CHANGE_MGT (POLICY_ID, DEVICE_TYPE_ID, TENANT_ID) VALUES (?, ?, ?)";
+            String query = "INSERT INTO DM_POLICY_CHANGE_MGT (POLICY_ID, DEVICE_TYPE, TENANT_ID) VALUES (?, ?, ?)";
             stmt = conn.prepareStatement(query);
             for (Policy policy : policies) {
                 stmt.setInt(1, policy.getId());
-                stmt.setInt(2, policy.getProfile().getDeviceType().getId());
+                stmt.setString(2, policy.getProfile().getDeviceType());
                 stmt.setInt(3, tenantId);
                 stmt.addBatch();
             }
@@ -1164,6 +1164,30 @@ public class PolicyDAOImpl implements PolicyDAO {
     }
 
     @Override
+    public void deleteEffectivePolicyToDevice(int deviceId, int enrolmentId) throws PolicyManagerDAOException {
+        Connection conn;
+        PreparedStatement stmt = null;
+
+        int tenantId = PrivilegedCarbonContext.getThreadLocalCarbonContext().getTenantId();
+        try {
+            conn = this.getConnection();
+            String query = "DELETE FROM DM_DEVICE_POLICY_APPLIED WHERE DEVICE_ID = ? AND TENANT_ID = ? " +
+                           "AND ENROLMENT_ID = ?";
+            stmt = conn.prepareStatement(query);
+            stmt.setInt(1, deviceId);
+            stmt.setInt(2, tenantId);
+            stmt.setInt(3, enrolmentId);
+            stmt.executeUpdate();
+
+        } catch (SQLException e) {
+            throw new PolicyManagerDAOException("Error occurred while deleting the effective policy " +
+                                                "to device", e);
+        } finally {
+            PolicyManagementDAOUtil.cleanupResources(stmt, null);
+        }
+    }
+
+    @Override
     public boolean checkPolicyAvailable(int deviceId, int enrollmentId) throws PolicyManagerDAOException {
         Connection conn;
         PreparedStatement stmt = null;
@@ -1302,11 +1326,7 @@ public class PolicyDAOImpl implements PolicyDAO {
             if (log.isDebugEnabled()) {
                 log.debug("Policy (" + policyId + ") delete from database.");
             }
-            if (deleted > 0) {
-                return true;
-            } else {
-                return false;
-            }
+            return deleted > 0;
         } catch (SQLException e) {
             throw new PolicyManagerDAOException("Unable to delete the policy (" + policyId + ") from database", e);
         } finally {
@@ -1584,7 +1604,7 @@ public class PolicyDAOImpl implements PolicyDAO {
                 byte[] contentBytes;
 
                 try {
-                    contentBytes = (byte[]) resultSet.getBytes("POLICY_CONTENT");
+                    contentBytes = resultSet.getBytes("POLICY_CONTENT");
                     bais = new ByteArrayInputStream(contentBytes);
                     ois = new ObjectInputStream(bais);
                     policy = (Policy) ois.readObject();

@@ -16,9 +16,6 @@
  * under the License.
  */
 
-var WEB_APP_TITLE = "WSO2 CDM";
-var WEB_APP_CONTEXT = "/devicemgt";
-var ADMIN_SERVICE_CONTEXT = "/devicemgt_admin";
 var USER_SESSION_KEY = "_UUF_USER";
 var UNSPECIFIED = "Unspecified";
 var httpURL = "httpURL";
@@ -33,9 +30,11 @@ var DEVICE_VENDOR = "vendor";
 var DEVICE_MODEL = "model";
 var DEVICE_PRODUCT = "PRODUCT";
 var DEVICE_OS_VERSION = "osVersion";
+var DEVICE_OS_BUILD_DATE = "osBuildDate";
 var DEVICE_PROPERTIES = "properties";
 var DEVICE_ENROLLMENT_INFO = "enrolmentInfo";
 var DEVICE_STATUS = "status";
+var DEVICE_INFO = "deviceInfo";
 
 var FEATURE_NAME = "featureName";
 var FEATURE_DESCRIPTION = "featureDescription";
@@ -58,8 +57,8 @@ var USER_STORE_CONFIG_ADMIN_SERVICE_END_POINT =
 
 var SOAP_VERSION = 1.2;
 var WEB_SERVICE_ADDRESSING_VERSION = 1.0;
-var ACCESS_TOKEN_PAIR_IDENTIFIER = "accessTokenPair";
-var ENCODED_CLIENT_KEYS_IDENTIFIER = "encodedClientKey";
+var TOKEN_PAIR = "tokenPair";
+var ENCODED_TENANT_BASED_CLIENT_APP_CREDENTIALS = "encodedTenantBasedClientAppCredentials";
 var CONTENT_TYPE_IDENTIFIER = "Content-Type";
 var CONTENT_DISPOSITION_IDENTIFIER = "Content-Disposition";
 var APPLICATION_JSON = "application/json";
@@ -71,14 +70,9 @@ var HTTP_GET = "GET";
 var HTTP_POST = "POST";
 var HTTP_PUT = "PUT";
 var HTTP_DELETE = "DELETE";
-var REFERER = "referer"
-
-var GRANT_TYPE_PASSWORD = "password";
-var GRANT_TYPE_SAML = "saml";
-
-var MQTT_QUEUE_CONFIG_NAME = "MQTT";
 
 var HTTP_CONFLICT = 409;
 var HTTP_CREATED = 201;
 
 var CACHED_CREDENTIALS = "tenantBasedCredentials";
+var ALLOWED_SCOPES = "scopes";

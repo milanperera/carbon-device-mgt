@@ -23,9 +23,13 @@ import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.certificate.mgt.core.config.datasource.DataSourceConfig;
 import org.wso2.carbon.certificate.mgt.core.config.datasource.JNDILookupDefinition;
 import org.wso2.carbon.certificate.mgt.core.dao.impl.GenericCertificateDAOImpl;
-import org.wso2.carbon.device.mgt.common.DeviceManagementConstants;
-import org.wso2.carbon.device.mgt.common.IllegalTransactionStateException;
-import org.wso2.carbon.device.mgt.common.TransactionManagementException;
+import org.wso2.carbon.certificate.mgt.core.dao.impl.OracleCertificateDAOImpl;
+import org.wso2.carbon.certificate.mgt.core.dao.impl.PostgreSQLCertificateDAOImpl;
+import org.wso2.carbon.certificate.mgt.core.dao.impl.SQLServerCertificateDAOImpl;
+import org.wso2.carbon.certificate.mgt.core.exception.IllegalTransactionStateException;
+import org.wso2.carbon.certificate.mgt.core.exception.TransactionManagementException;
+import org.wso2.carbon.certificate.mgt.core.exception.UnsupportedDatabaseEngineException;
+import org.wso2.carbon.certificate.mgt.core.util.CertificateManagementConstants;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -38,11 +42,30 @@ public class CertificateManagementDAOFactory {
     private static DataSource dataSource;
     private static String databaseEngine;
     private static final Log log = LogFactory.getLog(CertificateManagementDAOFactory.class);
-    private static ThreadLocal<Connection> currentConnection = new ThreadLocal<Connection>();
+    private static ThreadLocal<Connection> currentConnection = new ThreadLocal<>();
+    private static ThreadLocal<TxState> currentTxState = new ThreadLocal<>();
 
+    private enum TxState {
+        CONNECTION_NOT_BORROWED, CONNECTION_BORROWED, CONNECTION_CLOSED
+    }
 
     public static CertificateDAO getCertificateDAO() {
-            return new GenericCertificateDAOImpl();
+        if (databaseEngine != null) {
+            switch (databaseEngine) {
+                case CertificateManagementConstants.DataBaseTypes.DB_TYPE_ORACLE:
+                    return new OracleCertificateDAOImpl();
+                case CertificateManagementConstants.DataBaseTypes.DB_TYPE_MSSQL:
+                    return new SQLServerCertificateDAOImpl();
+                case CertificateManagementConstants.DataBaseTypes.DB_TYPE_POSTGRESQL:
+                    return new PostgreSQLCertificateDAOImpl();
+                case CertificateManagementConstants.DataBaseTypes.DB_TYPE_H2:
+                case CertificateManagementConstants.DataBaseTypes.DB_TYPE_MYSQL:
+                    return new GenericCertificateDAOImpl();
+                default:
+                    throw new UnsupportedDatabaseEngineException("Unsupported database engine : " + databaseEngine);
+            }
+        }
+        throw new IllegalStateException("Database engine has not initialized properly.");
     }
 
     public static void init(DataSourceConfig config) {
@@ -59,7 +82,7 @@ public class CertificateManagementDAOFactory {
         try {
             databaseEngine = dataSource.getConnection().getMetaData().getDatabaseProductName();
         } catch (SQLException e) {
-            log.error("Error occurred while retrieving config.datasource connection", e);
+            log.error("Error occurred while retrieving a datasource connection", e);
         }
     }
 
@@ -67,16 +90,29 @@ public class CertificateManagementDAOFactory {
         Connection conn = currentConnection.get();
         if (conn != null) {
             throw new IllegalTransactionStateException("A transaction is already active within the context of " +
-                    "this particular thread. Therefore, calling 'beginTransaction/openConnection' while another " +
-                    "transaction is already active is a sign of improper transaction handling");
+                                                       "this particular thread. Therefore, calling 'beginTransaction/openConnection' while another " +
+                                                       "transaction is already active is a sign of improper transaction handling");
         }
         try {
             conn = dataSource.getConnection();
-            conn.setAutoCommit(false);
-            currentConnection.set(conn);
         } catch (SQLException e) {
-            throw new TransactionManagementException("Error occurred while retrieving config.datasource connection", e);
+            throw new TransactionManagementException("Error occurred while retrieving a data source connection", e);
         }
+
+        try {
+            conn.setAutoCommit(false);
+        } catch (SQLException e) {
+            try {
+                conn.close();
+            } catch (SQLException e1) {
+                log.warn("Error occurred while closing the borrowed connection. " +
+                        "Transaction has ended pre-maturely", e1);
+            }
+            currentTxState.set(TxState.CONNECTION_CLOSED);
+            throw new TransactionManagementException("Error occurred while setting auto-commit to false", e);
+        }
+        currentConnection.set(conn);
+        currentTxState.set(TxState.CONNECTION_BORROWED);
     }
 
     public static void openConnection() throws SQLException {
@@ -86,8 +122,14 @@ public class CertificateManagementDAOFactory {
                     "this particular thread. Therefore, calling 'beginTransaction/openConnection' while another " +
                     "transaction is already active is a sign of improper transaction handling");
         }
-        conn = dataSource.getConnection();
+        try {
+            conn = dataSource.getConnection();
+        } catch (SQLException e) {
+            currentTxState.set(TxState.CONNECTION_NOT_BORROWED);
+            throw e;
+        }
         currentConnection.set(conn);
+        currentTxState.set(TxState.CONNECTION_BORROWED);
     }
 
     public static Connection getConnection() throws SQLException {
@@ -111,6 +153,8 @@ public class CertificateManagementDAOFactory {
             conn.commit();
         } catch (SQLException e) {
             log.error("Error occurred while committing the transaction", e);
+        } finally {
+            closeConnection();
         }
     }
 
@@ -125,10 +169,23 @@ public class CertificateManagementDAOFactory {
             conn.rollback();
         } catch (SQLException e) {
             log.warn("Error occurred while roll-backing the transaction", e);
+        } finally {
+            closeConnection();
         }
     }
 
     public static void closeConnection() {
+        TxState txState = currentTxState.get();
+        if (TxState.CONNECTION_NOT_BORROWED == txState) {
+            if (log.isDebugEnabled()) {
+                log.debug("No successful connection appears to have been borrowed to perform the underlying " +
+                        "transaction even though the 'openConnection' method has been called. Therefore, " +
+                        "'closeConnection' method is returning silently");
+            }
+            currentTxState.remove();
+            return;
+        }
+
         Connection conn = currentConnection.get();
         if (conn == null) {
             throw new IllegalTransactionStateException("No connection is associated with the current transaction. " +
@@ -138,9 +195,10 @@ public class CertificateManagementDAOFactory {
         try {
             conn.close();
         } catch (SQLException e) {
-            log.warn("Error occurred while close the connection");
+            log.warn("Error occurred while close the connection", e);
         }
         currentConnection.remove();
+        currentTxState.remove();
     }
 
 
@@ -155,14 +213,14 @@ public class CertificateManagementDAOFactory {
         if (config == null) {
             throw new RuntimeException(
                     "Device Management Repository data source configuration " + "is null and " +
-                    "thus, is not initialized"
+                            "thus, is not initialized"
             );
         }
         JNDILookupDefinition jndiConfig = config.getJndiLookupDefinition();
         if (jndiConfig != null) {
             if (log.isDebugEnabled()) {
                 log.debug("Initializing Device Management Repository data source using the JNDI " +
-                          "Lookup Definition");
+                        "Lookup Definition");
             }
             List<JNDILookupDefinition.JNDIProperty> jndiPropertyList =
                     jndiConfig.getJndiProperties();

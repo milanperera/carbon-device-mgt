@@ -22,7 +22,7 @@
     <parent>
         <groupId>org.wso2.carbon.devicemgt</groupId>
         <artifactId>device-mgt</artifactId>
-        <version>1.1.1-SNAPSHOT</version>
+        <version>1.2.7-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -83,6 +83,10 @@
             <artifactId>org.wso2.carbon.registry.indexing</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.wso2.carbon.registry</groupId>
+            <artifactId>org.wso2.carbon.registry.common</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.json.wso2</groupId>
             <artifactId>json</artifactId>
         </dependency>
@@ -121,9 +125,8 @@
                             org.wso2.carbon.registry.common.*;version="${carbon.registry.imp.pkg.version.range}",
                             org.wso2.carbon.registry.indexing.*; version="${carbon.registry.imp.pkg.version.range}",
                             org.json;version="${commons-json.version}",
-                            javax.xml.bind,
-                            javax.xml.bind.annotation,
-                            javax.xml.parsers,
+                            javax.xml.*,
+			    javax.xml.parsers;version="${javax.xml.parsers.import.pkg.version}";resolution:=optional,
                             org.w3c.dom,
                             org.wso2.carbon.base
                         </Import-Package>

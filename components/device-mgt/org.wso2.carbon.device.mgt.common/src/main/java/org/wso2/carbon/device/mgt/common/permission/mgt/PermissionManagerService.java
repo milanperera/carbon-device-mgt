@@ -18,7 +18,7 @@
 
 package org.wso2.carbon.device.mgt.common.permission.mgt;
 
-import java.util.List;
+import java.util.Properties;
 
 /**
  * This represents the Permission management functionality which should be implemented by
@@ -29,7 +29,6 @@ public interface PermissionManagerService {
     /**
      *
      * @param permission - Permission to be added
-     * @return The status of the operation.
      * @throws PermissionManagementException If some unusual behaviour is observed while adding the
      * permission.
      */
@@ -37,11 +36,11 @@ public interface PermissionManagerService {
 
     /**
      *
-     * @param url - url of the permission to be fetched.
-     * @return The matched Permission list.
+     * @param properties - Properties of the permission to be fetched.
+     * @return The matched Permission object.
      * @throws PermissionManagementException If some unusual behaviour is observed while fetching the
      * permission.
      */
-    List<Permission> getPermissions(String url) throws PermissionManagementException;
+    Permission getPermission(Properties properties) throws PermissionManagementException;
 
 }

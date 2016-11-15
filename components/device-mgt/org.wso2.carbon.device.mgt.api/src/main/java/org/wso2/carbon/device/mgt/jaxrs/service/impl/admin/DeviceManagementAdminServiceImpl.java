@@ -28,10 +28,10 @@ import org.wso2.carbon.device.mgt.common.DeviceManagementException;
 import org.wso2.carbon.device.mgt.jaxrs.beans.DeviceList;
 import org.wso2.carbon.device.mgt.jaxrs.beans.ErrorResponse;
 import org.wso2.carbon.device.mgt.jaxrs.service.api.admin.DeviceManagementAdminService;
-import org.wso2.carbon.device.mgt.jaxrs.service.impl.util.*;
-import org.wso2.carbon.device.mgt.jaxrs.service.impl.util.NotFoundException;
+import org.wso2.carbon.device.mgt.jaxrs.service.impl.util.RequestValidationUtil;
 import org.wso2.carbon.device.mgt.jaxrs.util.DeviceMgtAPIUtils;
 
+import javax.validation.constraints.Size;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -46,30 +46,26 @@ public class DeviceManagementAdminServiceImpl implements DeviceManagementAdminSe
 
     @Override
     @GET
-    public Response getDevicesByName(@QueryParam("name") String name,
-                                     @QueryParam("type") String type,
+    public Response getDevicesByName(@QueryParam("name") @Size(max = 45) String name,
+                                     @QueryParam("type") @Size(min = 2, max = 45) String type,
                                      @QueryParam("tenant-domain") String tenantDomain,
                                      @HeaderParam("If-Modified-Since") String ifModifiedSince,
                                      @QueryParam("offset") int offset,
                                      @QueryParam("limit") int limit) {
+        RequestValidationUtil.validatePaginationParameters(offset, limit);
         try {
             int currentTenantId = CarbonContext.getThreadLocalCarbonContext().getTenantId();
             if (MultitenantConstants.SUPER_TENANT_ID != currentTenantId) {
-                throw new UnauthorizedAccessException(
-                    new ErrorResponse.ErrorResponseBuilder().setCode(401l).setMessage(
-                        "Current logged in user is not authorized to perform this operation").build());
+                return Response.status(Response.Status.UNAUTHORIZED).entity(
+                        new ErrorResponse.ErrorResponseBuilder().setMessage(
+                                "Current logged in user is not authorized to perform this operation").build()).build();
             }
             PrivilegedCarbonContext.startTenantFlow();
             PrivilegedCarbonContext.getThreadLocalCarbonContext().setTenantDomain(tenantDomain);
             PrivilegedCarbonContext.getThreadLocalCarbonContext().setTenantId(DeviceMgtAPIUtils.getTenantId(tenantDomain));
 
             List<Device> devices = DeviceMgtAPIUtils.getDeviceManagementService().
-                getDevicesByNameAndType(name, type, offset, limit);
-            if (devices == null || devices.size() == 0) {
-                throw new NotFoundException(
-                        new ErrorResponse.ErrorResponseBuilder().setCode(404l).setMessage("No device, which carries" +
-                                " the name '" + name + "', is currently enrolled in the system").build());
-            }
+                    getDevicesByNameAndType(name, type, offset, limit);
 
             // setting up paginated result
             DeviceList deviceList = new DeviceList();
@@ -80,8 +76,8 @@ public class DeviceManagementAdminServiceImpl implements DeviceManagementAdminSe
         } catch (DeviceManagementException e) {
             String msg = "Error occurred at server side while fetching device list.";
             log.error(msg, e);
-            throw new UnexpectedServerErrorException(
-                new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build());
+            return Response.serverError().entity(
+                    new ErrorResponse.ErrorResponseBuilder().setMessage(msg).build()).build();
         } finally {
             PrivilegedCarbonContext.endTenantFlow();
         }

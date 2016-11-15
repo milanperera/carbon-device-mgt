@@ -22,34 +22,33 @@ package org.wso2.carbon.certificate.mgt.core.util;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.w3c.dom.Document;
+import org.wso2.carbon.certificate.mgt.core.config.CertificateConfigurationManager;
+import org.wso2.carbon.certificate.mgt.core.config.CertificateManagementConfig;
 import org.wso2.carbon.certificate.mgt.core.config.datasource.DataSourceConfig;
 import org.wso2.carbon.certificate.mgt.core.config.datasource.JNDILookupDefinition;
 import org.wso2.carbon.certificate.mgt.core.dao.CertificateManagementDAOUtil;
 import org.wso2.carbon.certificate.mgt.core.exception.CertificateManagementException;
 
 import javax.sql.DataSource;
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.ObjectOutputStream;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.List;
 
 public class CertificateManagerUtil {
 
-    private static final Log log = LogFactory.getLog(CertificateManagerUtil.class);
-
     public static final String GENERAL_CONFIG_RESOURCE_PATH = "general";
     public static final String MONITORING_FREQUENCY = "notifierFrequency";
+    private static final Log log = LogFactory.getLog(CertificateManagerUtil.class);
 
     public static Document convertToDocument(File file) throws CertificateManagementException {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         factory.setNamespaceAware(true);
         try {
             DocumentBuilder docBuilder = factory.newDocumentBuilder();
+            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
             return docBuilder.parse(file);
         } catch (Exception e) {
             throw new CertificateManagementException("Error occurred while parsing file, while converting " +
@@ -89,6 +88,20 @@ public class CertificateManagerUtil {
             }
         }
         return dataSource;
+    }
+
+    public static int validateCertificateListPageSize(int limit) throws CertificateManagementException {
+        if (limit == 0) {
+            CertificateManagementConfig certificateManagementConfig = CertificateConfigurationManager.getInstance().
+                    getCertificateManagementConfig();
+            if (certificateManagementConfig != null) {
+                return certificateManagementConfig.getDefaultPageSize();
+            } else {
+                throw new CertificateManagementException("Certificate-Mgt configuration has not initialized. Please check the " +
+                                                    "certificate-config.xml file.");
+            }
+        }
+        return limit;
     }
 
 }
