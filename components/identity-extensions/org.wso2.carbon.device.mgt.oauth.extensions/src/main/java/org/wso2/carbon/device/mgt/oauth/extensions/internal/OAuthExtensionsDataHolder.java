@@ -18,13 +18,13 @@
 
 package org.wso2.carbon.device.mgt.oauth.extensions.internal;
 
-import org.wso2.carbon.device.mgt.common.authorization.DeviceAccessAuthorizationService;
-import org.wso2.carbon.device.mgt.common.permission.mgt.PermissionManagerService;
-import org.wso2.carbon.device.mgt.core.service.DeviceManagementProviderService;
 import org.wso2.carbon.identity.oauth2.OAuth2TokenValidationService;
+import org.wso2.carbon.identity.oauth2.validators.OAuth2ScopeValidator;
 import org.wso2.carbon.user.core.service.RealmService;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * This holds the OSGi service references required for oauth extensions bundle.
@@ -33,14 +33,14 @@ public class OAuthExtensionsDataHolder {
 
     private RealmService realmService;
     private OAuth2TokenValidationService oAuth2TokenValidationService;
-    private PermissionManagerService permissionManagerService;
     private List<String> whitelistedScopes;
-    private String deviceScope;
-    private DeviceAccessAuthorizationService deviceAccessAuthorizationService;
+    private Map<String, OAuth2ScopeValidator> scopeValidators;
 
     private static OAuthExtensionsDataHolder thisInstance = new OAuthExtensionsDataHolder();
 
-    private OAuthExtensionsDataHolder() {}
+    private OAuthExtensionsDataHolder() {
+        scopeValidators = new HashMap<>();
+    }
 
     public static OAuthExtensionsDataHolder getInstance() {
         return thisInstance;
@@ -69,17 +69,6 @@ public class OAuthExtensionsDataHolder {
         this.oAuth2TokenValidationService = oAuth2TokenValidationService;
     }
 
-    public void setPermissionManagerService(PermissionManagerService permissionManagerService) {
-        this.permissionManagerService = permissionManagerService;
-    }
-
-    public PermissionManagerService getPermissionManagerService() {
-        if (permissionManagerService == null) {
-            throw new IllegalStateException("PermissionManager service is not initialized properly");
-        }
-        return permissionManagerService;
-    }
-
     public List<String> getWhitelistedScopes() {
         return whitelistedScopes;
     }
@@ -88,15 +77,20 @@ public class OAuthExtensionsDataHolder {
         this.whitelistedScopes = whitelistedScopes;
     }
 
-    public String getDeviceScope() {
-        return deviceScope;
+    public Map<String, OAuth2ScopeValidator> getScopeValidators() {
+        return scopeValidators;
     }
 
-    public DeviceAccessAuthorizationService getDeviceAccessAuthorizationService() {
-        return deviceAccessAuthorizationService;
+    public void setScopeValidators(Map<String, OAuth2ScopeValidator> scopeValidators) {
+        this.scopeValidators = scopeValidators;
     }
 
-    public void setDeviceAccessAuthorizationService(DeviceAccessAuthorizationService deviceAccessAuthorizationService) {
-        this.deviceAccessAuthorizationService = deviceAccessAuthorizationService;
+    public void addScopeValidator(OAuth2ScopeValidator oAuth2ScopeValidator, String prefix) {
+        scopeValidators.put(prefix, oAuth2ScopeValidator);
     }
+
+    public void removeScopeValidator() {
+        scopeValidators = null;
+    }
+
 }

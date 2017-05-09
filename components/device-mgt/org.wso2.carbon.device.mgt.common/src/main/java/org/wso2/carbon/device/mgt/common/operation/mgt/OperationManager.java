@@ -18,8 +18,10 @@
 package org.wso2.carbon.device.mgt.common.operation.mgt;
 
 import org.wso2.carbon.device.mgt.common.*;
+import org.wso2.carbon.device.mgt.common.push.notification.NotificationStrategy;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * This represents the Device Operation management functionality which should be implemented by
@@ -92,5 +94,17 @@ public interface OperationManager {
     List<Activity> getActivitiesUpdatedAfter(long timestamp, int limit, int offset) throws OperationManagementException;
 
     int getActivityCountUpdatedAfter(long timestamp) throws OperationManagementException;
+
+    /**
+     * Operation manger implementation can have a push notification stratergy
+     * @param notificationStrategy eg: mqtt/xmpp
+     */
+    void setNotificationStrategy(NotificationStrategy notificationStrategy);
+
+    /**
+     * retrive the push notification strategy.
+     * @return NotificationStrategy
+     */
+    NotificationStrategy getNotificationStrategy();
 
 }

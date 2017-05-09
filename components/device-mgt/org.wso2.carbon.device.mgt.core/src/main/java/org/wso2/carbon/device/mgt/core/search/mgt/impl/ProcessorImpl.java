@@ -62,27 +62,42 @@ public class ProcessorImpl implements Processor {
     @Override
     public List<Device> execute(SearchContext searchContext) throws SearchMgtException {
 
+        if(!Utils.validateOperators(searchContext.getConditions())){
+            throw new SearchMgtException("Invalid validator is provided.");
+        }
+
         QueryBuilder queryBuilder = new QueryBuilderImpl();
         List<Device> generalDevices = new ArrayList<>();
         List<List<Device>> allANDDevices = new ArrayList<>();
         List<List<Device>> allORDevices = new ArrayList<>();
         List<Device> locationDevices = new ArrayList<>();
         try {
-            Map<String, List<String>> queries = queryBuilder.buildQueries(searchContext.getConditions());
             DeviceManagementDAOFactory.openConnection();
+            Map<String, List<QueryHolder>> queries = queryBuilder.buildQueries(searchContext.getConditions());
+
 
             if (queries.containsKey(Constants.GENERAL)) {
                 generalDevices = searchDeviceDetailsTable(queries.get(Constants.GENERAL).get(0));
             }
             if (queries.containsKey(Constants.PROP_AND)) {
+<<<<<<< HEAD
                 for (String query : queries.get(Constants.PROP_AND)) {
                     List<Device> andDevices = searchDeviceDetailsTable(query);
+=======
+                for (QueryHolder queryHolder : queries.get(Constants.PROP_AND)) {
+                    List<Device> andDevices = searchDeviceDetailsTable(queryHolder);
+>>>>>>> 964eae6f92d87baed3557b4f72bebe4bd5b4d832
                     allANDDevices.add(andDevices);
                 }
             }
             if (queries.containsKey(Constants.PROP_OR)) {
+<<<<<<< HEAD
                 for (String query : queries.get(Constants.PROP_OR)) {
                     List<Device> orDevices = searchDeviceDetailsTable(query);
+=======
+                for (QueryHolder queryHolder : queries.get(Constants.PROP_OR)) {
+                    List<Device> orDevices = searchDeviceDetailsTable(queryHolder);
+>>>>>>> 964eae6f92d87baed3557b4f72bebe4bd5b4d832
                     allORDevices.add(orDevices);
                 }
             }
@@ -141,12 +156,12 @@ public class ProcessorImpl implements Processor {
     @Override
     public List<Device> getUpdatedDevices(long epochTime) throws SearchMgtException {
 
-        if((1 + (int)Math.floor(Math.log10(epochTime))) <=10 ) {
+        if ((1 + (int) Math.floor(Math.log10(epochTime))) <= 10) {
             epochTime = epochTime * 1000;
         }
         QueryBuilder queryBuilder = new QueryBuilderImpl();
         try {
-           String query =  queryBuilder.processUpdatedDevices(epochTime);
+            QueryHolder query = queryBuilder.processUpdatedDevices(epochTime);
             DeviceManagementDAOFactory.openConnection();
             return searchDeviceDetailsTable(query);
         } catch (InvalidOperatorException e) {
@@ -218,7 +233,7 @@ public class ProcessorImpl implements Processor {
         for (List<Device> devices : deLists) {
             Map<Integer, Device> deviceMap = new HashMap<>();
 
-            for (Device device: devices) {
+            for (Device device : devices) {
                 deviceMap.put(device.getId(), device);
             }
             maps.add(deviceMap);
@@ -241,9 +256,15 @@ public class ProcessorImpl implements Processor {
         }
     }
 
+<<<<<<< HEAD
     private List<Device> searchDeviceDetailsTable(String query) throws SearchDAOException {
         if (log.isDebugEnabled()) {
             log.debug("Query : " + query);
+=======
+    private List<Device> searchDeviceDetailsTable(QueryHolder queryHolder) throws SearchDAOException {
+        if (log.isDebugEnabled()) {
+            log.debug("Query : " + queryHolder.getQuery());
+>>>>>>> 964eae6f92d87baed3557b4f72bebe4bd5b4d832
         }
         Connection conn;
         PreparedStatement stmt = null;
@@ -252,7 +273,30 @@ public class ProcessorImpl implements Processor {
         Map<Integer, Integer> devs = new HashMap<>();
         try {
             conn = this.getConnection();
+<<<<<<< HEAD
             stmt = conn.prepareStatement(query);
+=======
+            stmt = conn.prepareStatement(queryHolder.getQuery());
+
+            int x = 1;
+            ValueType[] types = queryHolder.getTypes();
+            for (ValueType type : types) {
+                if (type.getColumnType().equals(ValueType.columnType.STRING)) {
+                    stmt.setString(x, type.getStringValue());
+                    x++;
+                } else if (type.getColumnType().equals(ValueType.columnType.INTEGER)) {
+                    stmt.setInt(x, type.getIntValue());
+                    x++;
+                } else if (type.getColumnType().equals(ValueType.columnType.LONG)){
+                    stmt.setLong(x, type.getLongValue());
+                    x++;
+                } else  if(type.getColumnType().equals(ValueType.columnType.DOUBLE)){
+                    stmt.setDouble(x, type.getDoubleValue());
+                    x++;
+                }
+            }
+
+>>>>>>> 964eae6f92d87baed3557b4f72bebe4bd5b4d832
             rs = stmt.executeQuery();
             while (rs.next()) {
                 if (!devs.containsKey(rs.getInt("ID"))) {
@@ -268,6 +312,7 @@ public class ProcessorImpl implements Processor {
                     enrolmentInfo.setOwner(rs.getString("OWNER"));
                     enrolmentInfo.setOwnership(EnrolmentInfo.OwnerShip.valueOf(rs.getString("OWNERSHIP")));
                     device.setEnrolmentInfo(enrolmentInfo);
+<<<<<<< HEAD
 
                     DeviceIdentifier identifier = new DeviceIdentifier();
                     identifier.setType(rs.getString("DEVICE_TYPE_NAME"));
@@ -380,4 +425,117 @@ public class ProcessorImpl implements Processor {
         return null;
     }
 }
+=======
+>>>>>>> 964eae6f92d87baed3557b4f72bebe4bd5b4d832
 
+                    DeviceIdentifier identifier = new DeviceIdentifier();
+                    identifier.setType(rs.getString("DEVICE_TYPE_NAME"));
+                    identifier.setId(rs.getString("DEVICE_IDENTIFICATION"));
+
+                    DeviceInfo deviceInfo = new DeviceInfo();
+                    deviceInfo.setAvailableRAMMemory(rs.getDouble("AVAILABLE_RAM_MEMORY"));
+                    deviceInfo.setBatteryLevel(rs.getDouble("BATTERY_LEVEL"));
+                    deviceInfo.setConnectionType(rs.getString("CONNECTION_TYPE"));
+                    deviceInfo.setCpuUsage(rs.getDouble("CPU_USAGE"));
+                    deviceInfo.setDeviceModel(rs.getString("DEVICE_MODEL"));
+                    deviceInfo.setExternalAvailableMemory(rs.getDouble("EXTERNAL_AVAILABLE_MEMORY"));
+                    deviceInfo.setExternalTotalMemory(rs.getDouble("EXTERNAL_TOTAL_MEMORY"));
+                    deviceInfo.setInternalAvailableMemory(rs.getDouble("INTERNAL_AVAILABLE_MEMORY"));
+                    deviceInfo.setInternalTotalMemory(rs.getDouble("EXTERNAL_TOTAL_MEMORY"));
+                    deviceInfo.setOsVersion(rs.getString("OS_VERSION"));
+                    deviceInfo.setOsBuildDate(rs.getString("OS_BUILD_DATE"));
+                    deviceInfo.setPluggedIn(rs.getBoolean("PLUGGED_IN"));
+                    deviceInfo.setSsid(rs.getString("SSID"));
+                    deviceInfo.setTotalRAMMemory(rs.getDouble("TOTAL_RAM_MEMORY"));
+                    deviceInfo.setVendor(rs.getString("VENDOR"));
+                    deviceInfo.setUpdatedTime(new java.util.Date(rs.getLong("UPDATE_TIMESTAMP")));
+
+                    DeviceLocation deviceLocation = new DeviceLocation();
+                    deviceLocation.setLatitude(rs.getDouble("LATITUDE"));
+                    deviceLocation.setLongitude(rs.getDouble("LONGITUDE"));
+                    deviceLocation.setStreet1(rs.getString("STREET1"));
+                    deviceLocation.setStreet2(rs.getString("STREET2"));
+                    deviceLocation.setCity(rs.getString("CITY"));
+                    deviceLocation.setState(rs.getString("STATE"));
+                    deviceLocation.setZip(rs.getString("ZIP"));
+                    deviceLocation.setCountry(rs.getString("COUNTRY"));
+                    deviceLocation.setDeviceId(rs.getInt("ID"));
+                    deviceLocation.setUpdatedTime(new java.util.Date(rs.getLong("DL_UPDATED_TIMESTAMP")));
+
+                    deviceInfo.setLocation(deviceLocation);
+                    device.setDeviceInfo(deviceInfo);
+                    devices.add(device);
+                    devs.put(device.getId(), device.getId());
+                }
+            }
+        } catch (SQLException e) {
+            throw new SearchDAOException("Error occurred while aquiring the device details.", e);
+        } finally {
+            DeviceManagementDAOUtil.cleanupResources(stmt, rs);
+        }
+        this.fillPropertiesOfDevices(devices);
+        if (log.isDebugEnabled()) {
+            log.debug("Number of the device returned from the query : " + devices.size());
+        }
+        return devices;
+    }
+
+
+    private Connection getConnection() throws SQLException {
+        return DeviceManagementDAOFactory.getConnection();
+    }
+
+    private List<Device> fillPropertiesOfDevices(List<Device> devices) throws SearchDAOException {
+        if (devices.isEmpty()) {
+            return null;
+        }
+        Connection conn;
+        PreparedStatement stmt = null;
+        ResultSet rs = null;
+        try {
+            conn = this.getConnection();
+            String query = "SELECT * FROM DM_DEVICE_INFO WHERE DEVICE_ID IN (";
+            if (conn.getMetaData().getDatabaseProductName().contains("H2") || conn.getMetaData()
+                    .getDatabaseProductName().contains("MySQL")) {
+                StringBuilder builder = new StringBuilder();
+                for (int i = 0; i < devices.size(); i++) {
+                    builder.append("?,");
+                }
+                query += builder.deleteCharAt(builder.length() - 1).toString() + ") ORDER BY DEVICE_ID";
+                stmt = conn.prepareStatement(query);
+                for (int i = 0; i < devices.size(); i++) {
+                    stmt.setInt(i + 1, devices.get(i).getId());
+                }
+            } else {
+                query += "?) ORDER BY DEVICE_ID";
+                stmt = conn.prepareStatement(query);
+                Array array = conn.createArrayOf("INT", Utils.getArrayOfDeviceIds(devices));
+                stmt.setArray(1, array);
+            }
+            rs = stmt.executeQuery();
+
+            DeviceInfo dInfo;
+            while (rs.next()) {
+                dInfo = this.getDeviceInfo(devices, rs.getInt("DEVICE_ID"));
+                dInfo.getDeviceDetailsMap().put(rs.getString("KEY_FIELD"), rs.getString("VALUE_FIELD"));
+            }
+        } catch (SQLException e) {
+            throw new SearchDAOException("Error occurred while retrieving the device properties.", e);
+        } finally {
+            DeviceManagementDAOUtil.cleanupResources(stmt, rs);
+        }
+        return devices;
+    }
+
+    private DeviceInfo getDeviceInfo(List<Device> devices, int deviceId) {
+        for (Device device : devices) {
+            if (device.getId() == deviceId) {
+                if (device.getDeviceInfo() == null) {
+                    device.setDeviceInfo(new DeviceInfo());
+                }
+                return device.getDeviceInfo();
+            }
+        }
+        return null;
+    }
+}

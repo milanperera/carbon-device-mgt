@@ -24,6 +24,7 @@ deviceModule = function () {
     var constants = require('/app/modules/constants.js');
     var devicemgtProps = require("/app/modules/conf-reader/main.js")["conf"];
     var serviceInvokers = require("/app/modules/oauth/token-protected-service-invokers.js")["invokers"];
+    var batchProvider = require("/app/modules/batch-provider-api.js")["batchProviders"];
 
     var publicMethods = {};
     var privateMethods = {};
@@ -67,6 +68,56 @@ deviceModule = function () {
             log.error("User object was not found in the session");
             throw constants["ERRORS"]["USER_NOT_FOUND"];
         }
+        var userName = carbonUser.username + "@" + carbonUser.domain;
+
+        var locationDataSet = [];
+        switch (deviceType) {
+            case 'android':
+                locationDataSet = batchProvider.getData(userName, deviceId, deviceType);
+                break;
+            case 'android_sense':
+                locationDataSet = batchProvider.getData(userName, deviceId, deviceType);
+                break;
+
+        }
+        var locationData = [];
+        var locationTimeData = [];
+        if (locationDataSet != null) {
+
+            for (var i = 0; i < locationDataSet.length; i++) {
+                var gpsReading = {};
+                var gpsReadingTimes = {};
+                gpsReading.lat = locationDataSet[i].latitude;
+                gpsReading.lng = locationDataSet[i].longitude;
+                if (deviceType == "android") {
+                    gpsReadingTimes.time = locationDataSet[i].timeStamp;
+                } else {
+                    gpsReadingTimes.time = locationDataSet[i].meta_timestamp;
+                }
+                locationData.push(gpsReading);
+                locationTimeData.push(gpsReadingTimes);
+            }
+        }
+        var locationInfo = {};
+        try {
+            var url = devicemgtProps["httpsURL"] + "/api/device-mgt/v1.0/devices/" + deviceType + "/" + deviceId + "/location";
+            serviceInvokers.XMLHttp.get(
+                url,
+                function (backendResponse) {
+
+                    if (backendResponse.status == 200 && backendResponse.responseText) {
+                        var device = parse(backendResponse.responseText);
+                        locationInfo.latitude = device.latitude;
+                        locationInfo.longitude = device.longitude;
+                        locationInfo.updatedOn = device.updatedTime;
+
+                    }
+                });
+        } catch (e) {
+            log.error(e.message, e);
+        }
+
+
         var utility = require('/app/modules/utility.js')["utility"];
         try {
             utility.startTenantFlow(carbonUser);
@@ -143,7 +194,26 @@ deviceModule = function () {
                         }
                         if (device["deviceInfo"]) {
                             filteredDeviceData["latestDeviceInfo"] = device["deviceInfo"];
+
+                            //location related verification and modifications
+                            // adding the location histry for the movement path.
+                            var locationHistory = {};
+                            locationHistory.locations = locationData;
+                            locationHistory.times = locationTimeData;
+                            filteredDeviceData["locationHistory"] = locationHistory;
+
+                            //checking for the latest location information.
+                            if (filteredDeviceData.latestDeviceInfo.location && locationInfo) {
+                                var infoDate = new Date(filteredDeviceData.latestDeviceInfo.location.updatedTime);
+                                var locationDate = new Date(locationInfo.updatedOn);
+                                if (infoDate < locationDate) {
+                                    filteredDeviceData.latestDeviceInfo.location.longitude = locationInfo.longitude;
+                                    filteredDeviceData.latestDeviceInfo.location.latitude = locationInfo.latitude;
+                                }
+                            }
                         }
+
+
                         response["content"] = filteredDeviceData;
                         response["status"] = "success";
                         return response;

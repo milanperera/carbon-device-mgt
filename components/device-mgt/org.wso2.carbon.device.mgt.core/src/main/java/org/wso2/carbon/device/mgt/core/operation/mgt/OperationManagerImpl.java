@@ -21,16 +21,26 @@ package org.wso2.carbon.device.mgt.core.operation.mgt;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.context.CarbonContext;
-import org.wso2.carbon.device.mgt.common.*;
+import org.wso2.carbon.device.mgt.common.Device;
+import org.wso2.carbon.device.mgt.common.DeviceIdentifier;
+import org.wso2.carbon.device.mgt.common.EnrolmentInfo;
+import org.wso2.carbon.device.mgt.common.InvalidDeviceException;
+import org.wso2.carbon.device.mgt.common.MonitoringOperation;
+import org.wso2.carbon.device.mgt.common.PaginationRequest;
+import org.wso2.carbon.device.mgt.common.PaginationResult;
+import org.wso2.carbon.device.mgt.common.TransactionManagementException;
 import org.wso2.carbon.device.mgt.common.authorization.DeviceAccessAuthorizationException;
 import org.wso2.carbon.device.mgt.common.group.mgt.DeviceGroupConstants;
-import org.wso2.carbon.device.mgt.common.operation.mgt.*;
+import org.wso2.carbon.device.mgt.common.operation.mgt.Activity;
+import org.wso2.carbon.device.mgt.common.operation.mgt.ActivityStatus;
+import org.wso2.carbon.device.mgt.common.operation.mgt.Operation;
+import org.wso2.carbon.device.mgt.common.operation.mgt.OperationManagementException;
+import org.wso2.carbon.device.mgt.common.operation.mgt.OperationManager;
 import org.wso2.carbon.device.mgt.common.push.notification.NotificationContext;
 import org.wso2.carbon.device.mgt.common.push.notification.NotificationStrategy;
 import org.wso2.carbon.device.mgt.common.push.notification.PushNotificationExecutionFailedException;
 import org.wso2.carbon.device.mgt.core.DeviceManagementConstants;
 import org.wso2.carbon.device.mgt.core.config.DeviceConfigurationManager;
-import org.wso2.carbon.device.mgt.core.config.task.TaskConfiguration;
 import org.wso2.carbon.device.mgt.core.dao.DeviceDAO;
 import org.wso2.carbon.device.mgt.core.dao.DeviceManagementDAOException;
 import org.wso2.carbon.device.mgt.core.dao.DeviceManagementDAOFactory;
@@ -43,6 +53,7 @@ import org.wso2.carbon.device.mgt.core.operation.mgt.dao.OperationMappingDAO;
 import org.wso2.carbon.device.mgt.core.operation.mgt.dao.util.OperationDAOUtil;
 import org.wso2.carbon.device.mgt.core.operation.mgt.util.DeviceIDHolder;
 import org.wso2.carbon.device.mgt.core.operation.mgt.util.OperationCreateTimeComparator;
+import org.wso2.carbon.device.mgt.core.service.DeviceManagementProviderService;
 import org.wso2.carbon.device.mgt.core.task.DeviceTaskManager;
 import org.wso2.carbon.device.mgt.core.task.impl.DeviceTaskManagerImpl;
 import org.wso2.carbon.device.mgt.core.util.DeviceManagerUtil;
@@ -71,6 +82,7 @@ public class OperationManagerImpl implements OperationManager {
     private DeviceDAO deviceDAO;
     private EnrollmentDAO enrollmentDAO;
     private NotificationStrategy notificationStrategy;
+    private String deviceType;
 
     public OperationManagerImpl() {
         commandOperationDAO = OperationManagementDAOFactory.getCommandOperationDAO();
@@ -83,8 +95,21 @@ public class OperationManagerImpl implements OperationManager {
         enrollmentDAO = DeviceManagementDAOFactory.getEnrollmentDAO();
     }
 
-    public OperationManagerImpl(NotificationStrategy notificationStrategy) {
+    public OperationManagerImpl(String deviceType) {
         this();
+        this.deviceType = deviceType;
+    }
+
+    public NotificationStrategy getNotificationStrategy() {
+        return notificationStrategy;
+    }
+
+    public void setNotificationStrategy(NotificationStrategy notificationStrategy) {
+        this.notificationStrategy = notificationStrategy;
+    }
+
+    public OperationManagerImpl(String deviceType, NotificationStrategy notificationStrategy) {
+        this(deviceType);
         this.notificationStrategy = notificationStrategy;
     }
 
@@ -106,7 +131,7 @@ public class OperationManagerImpl implements OperationManager {
                 DeviceIDHolder deviceAuthorizationResult = this.authorizeDevices(operation, validDeviceIds);
                 List<DeviceIdentifier> authorizedDeviceList = deviceAuthorizationResult.getValidDeviceIDList();
                 if (authorizedDeviceList.size() <= 0) {
-                    log.info("User : " + getUser() + " is not authorized to perform operations on given device-list.");
+                    log.warn("User : " + getUser() + " is not authorized to perform operations on given device-list.");
                     Activity activity = new Activity();
                     //Send the operation statuses only for admin triggered operations
                     String deviceType = validDeviceIds.get(0).getType();
@@ -119,8 +144,18 @@ public class OperationManagerImpl implements OperationManager {
                 org.wso2.carbon.device.mgt.core.dto.operation.mgt.Operation operationDto =
                         OperationDAOUtil.convertOperation(operation);
                 int operationId = this.lookupOperationDAO(operation).addOperation(operationDto);
-                boolean isScheduledOperation = this.isTaskScheduledOperation(operation);
+                boolean isScheduledOperation = this.isTaskScheduledOperation(operation, deviceIds);
                 boolean isNotRepeated = false;
+                boolean isScheduled = false;
+
+                // check whether device list is greater than batch size notification strategy has enable to send push
+                // notification using scheduler task
+                if (DeviceConfigurationManager.getInstance().getDeviceManagementConfig().
+                        getPushNotificationConfiguration().getSchedulerBatchSize() < authorizedDeviceList.size() &&
+                        notificationStrategy != null) {
+                    isScheduled = notificationStrategy.getConfig().isScheduled();
+                }
+
                 boolean hasExistingTaskOperation;
                 int enrolmentId;
                 if (org.wso2.carbon.device.mgt.core.dto.operation.mgt.Operation.Control.NO_REPEAT == operationDto.
@@ -137,7 +172,7 @@ public class OperationManagerImpl implements OperationManager {
                     if (isScheduledOperation) {
                         hasExistingTaskOperation = operationDAO.updateTaskOperation(enrolmentId, operationCode);
                         if (!hasExistingTaskOperation) {
-                            operationMappingDAO.addOperationMapping(operationId, enrolmentId);
+                            operationMappingDAO.addOperationMapping(operationId, enrolmentId, isScheduled);
                         }
                     } else if (isNotRepeated) {
                         operationDAO.updateEnrollmentOperationsStatus(enrolmentId, operationCode,
@@ -145,17 +180,27 @@ public class OperationManagerImpl implements OperationManager {
                                                                               Operation.Status.PENDING,
                                                                       org.wso2.carbon.device.mgt.core.dto.operation.mgt.
                                                                               Operation.Status.REPEATED);
-                        operationMappingDAO.addOperationMapping(operationId, enrolmentId);
+                        operationMappingDAO.addOperationMapping(operationId, enrolmentId, isScheduled);
                     } else {
-                        operationMappingDAO.addOperationMapping(operationId, enrolmentId);
+                        operationMappingDAO.addOperationMapping(operationId, enrolmentId, isScheduled);
                     }
-                    if (notificationStrategy != null) {
+                    /*
+                    If notification strategy has not enable to send push notification using scheduler task
+                    we will send notification immediately
+                    */
+                    if (notificationStrategy != null && !isScheduled) {
                         try {
+                            if (log.isDebugEnabled()) {
+                                log.debug("Sending push notification to " + deviceId + " from add operation method.");
+                            }
                             notificationStrategy.execute(new NotificationContext(deviceId, operation));
+                            operationMappingDAO.updateOperationMapping(operationId, enrolmentId, org.wso2.carbon.device.mgt.core.dto.operation.mgt.Operation.PushNotificationStatus.COMPLETED);
                         } catch (PushNotificationExecutionFailedException e) {
                             log.error("Error occurred while sending push notifications to " +
                                       deviceId.getType() + " device carrying id '" +
                                       deviceId + "'", e);
+                            // Reschedule if push notification failed.
+                            operationMappingDAO.updateOperationMapping(operationId, enrolmentId, org.wso2.carbon.device.mgt.core.dto.operation.mgt.Operation.PushNotificationStatus.SCHEDULED);
                         }
                     }
                 }
@@ -868,7 +913,7 @@ public class OperationManagerImpl implements OperationManager {
     private boolean isAuthenticationSkippedOperation(Operation operation) {
 
         //This is to check weather operations are coming from the task related to retrieving device information.
-        DeviceTaskManager taskManager = new DeviceTaskManagerImpl();
+        DeviceTaskManager taskManager = new DeviceTaskManagerImpl(deviceType);
         if (taskManager.isTaskOperation(operation.getCode())) {
             return true;
         }
@@ -1013,14 +1058,39 @@ public class OperationManagerImpl implements OperationManager {
         return resetStatus;
     }
 
-    private boolean isTaskScheduledOperation(Operation operation) {
-        TaskConfiguration taskConfiguration = DeviceConfigurationManager.getInstance().getDeviceManagementConfig().
-                getTaskConfiguration();
-        for (TaskConfiguration.Operation op : taskConfiguration.getOperations()) {
-            if (operation.getCode().equals(op.getOperationName())) {
+    private boolean isTaskScheduledOperation(Operation operation, List<DeviceIdentifier> deviceIds) {
+        DeviceManagementProviderService deviceManagementProviderService = DeviceManagementDataHolder.getInstance().
+                getDeviceManagementProvider();
+
+        List<MonitoringOperation> monitoringOperations = deviceManagementProviderService.getMonitoringOperationList(deviceType);//Get task list from each device type
+
+        for(MonitoringOperation op : monitoringOperations){
+            if (operation.getCode().equals(op.getTaskName())) {
                 return true;
             }
         }
+
+//        for(String dti : taskOperation){
+//            if (dti.equals(deviceType)) {
+//                monitoringOperations = deviceTypeSpecificTasks.get(dti);
+//
+//            }
+//        }
+//
+//        for(DeviceIdentifier deviceIdentifier : deviceIds){
+//            String deviceType = deviceIdentifier.getType();
+//
+//
+//
+//        }
+
+//        TaskConfiguration taskConfiguration = DeviceConfigurationManager.getInstance().getDeviceManagementConfig().
+//                getTaskConfiguration();
+//        for (TaskConfiguration.Operation op : taskConfiguration.getOperations()) {
+//            if (operation.getCode().equals(op.getOperationName())) {
+//                return true;
+//            }
+//        }
         return false;
     }
 

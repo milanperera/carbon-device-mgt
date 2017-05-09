@@ -1,13 +1,10 @@
 /*
  Copyright (c) 2016, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
-
  WSO2 Inc. licenses this file to you under the Apache License,
  Version 2.0 (the "License"); you may not use this file except
  in compliance with the License.
  You may obtain a copy of the License at
-
  http://www.apache.org/licenses/LICENSE-2.0
-
  Unless required by applicable law or agreed to in writing,
  software distributed under the License is distributed on an
  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
@@ -47,10 +44,17 @@ var dynamicForm = '<div class="dynamic-search-param row"><div class="row"><a cla
                   '<select class="state no-tag form-control select2-custom"><option>AND</option><option>OR</option></select></div><div ' +
                   'class="form-group wr-input-control col-md-4"><label class="wr-input-label ">Key</label><select class=' +
                   '"txt-key form-control select2-custom"><option value = "deviceModel">Device Model' +
+<<<<<<< HEAD
                   '</option><option value = "vendor">Vendor</option><option value = "osVersion">OS Version' +
                   '</option><option value = "batteryLevel">Battery Level</option><option value =' +
                   ' "internalTotalMemory">Internal Total Memory</option> <option value ="internalAvailableMemory">' +
                   'Internal Available Memory</option> <option value = "externalTotalMemory">externalTotalMemory</option>' +
+=======
+                  '</option><option value = "PhoneNumber">Phone Number</option><option value = "vendor">Vendor</option><option value = "osVersion">OS Version' +
+                  '</option><option value = "batteryLevel">Battery Level</option><option value =' +
+                  ' "internalTotalMemory">Internal Total Memory</option> <option value ="internalAvailableMemory">' +
+                  'Internal Available Memory</option> <option value = "externalTotalMemory">External Total Memory</option>' +
+>>>>>>> 964eae6f92d87baed3557b4f72bebe4bd5b4d832
                   ' <option value = "externalAvailableMemory">External Available Memory' +
                   '</option> <option value = "connectionType">Connection Type</option> <option value =' +
                   ' "ssid">SSID</option><option value = "cpuUsage">CPU Usage</option><option value = "totalRAMMemory">' +
@@ -86,7 +90,11 @@ $(document).ready(function () {
      */
     function getOperators(keyValue) {
         if (nonNumericKeyValuePair.indexOf(keyValue) < 0) {
+<<<<<<< HEAD
             return '<option> =</option><option> !=</option><option> <</option><option> =<</option><option>' +
+=======
+            return '<option> =</option><option> !=</option><option> <</option><option> <=</option><option>' +
+>>>>>>> 964eae6f92d87baed3557b4f72bebe4bd5b4d832
                 ' ></option><option> >=</option>';
         } else {
             return '<option> =</option><option> !=</option><option><option> %</option>';

@@ -22,14 +22,14 @@
  * initial mode and with out select mode.
  */
 function InitiateViewOption(url) {
-    if ($(".select-enable-btn").text() == "Select") {
+    if ($(".select-enable-btn").text() == "Select" && !$(this).hasClass("btn")) {
+        url = $(this).parent().data("url");
         $(location).attr('href', url);
     }
 }
 
 (function () {
     var cache = {};
-    var permissionSet = {};
     var validateAndReturn = function (value) {
         return (value == undefined || value == null) ? "Unspecified" : value;
     };
@@ -44,15 +44,6 @@ function InitiateViewOption(url) {
             }, {});
         }
     });
-
-    //This method is used to setup permission for device listing
-    $.setPermission = function (permission) {
-        permissionSet[permission] = true;
-    };
-
-    $.hasPermission = function (permission) {
-        return permissionSet[permission];
-    };
 })();
 
 /*
@@ -61,48 +52,38 @@ function InitiateViewOption(url) {
 var deviceCheckbox = "#ast-container .ctrl-wr-asset .itm-select input[type='checkbox']";
 var assetContainer = "#ast-container";
 
-var deviceListing, currentUser, groupName, groupOwner;
+var deviceListing, currentUser, groupId;
 
 /*
  * DOM ready functions.
  */
 $(document).ready(function () {
+
+    var permissionSet = {};
+    $.setPermission = function (permission) {
+        permissionSet[permission] = true;
+    };
+
+    $.hasPermission = function (permission) {
+        return permissionSet[permission];
+    };
+
     deviceListing = $("#device-listing");
     currentUser = deviceListing.data("current-user");
 
-    groupName = getParameterByName("groupName");
-    groupOwner = getParameterByName("groupOwner");
+    groupId = getParameterByName("groupId");
 
     /* Adding selected class for selected devices */
     $(deviceCheckbox).each(function () {
         addDeviceSelectedClass(this);
     });
 
-    var permissionList = $("#permission").data("permission");
-    for (var key in permissionList) {
-        if (permissionList.hasOwnProperty(key)) {
-            $.setPermission(key);
-        }
-    }
-
     /* for device list sorting drop down */
     $(".ctrl-filter-type-switcher").popover({
-                                                html: true,
-                                                content: function () {
-                                                    return $("#content-filter-types").html();
-                                                }
-                                            });
-
-    $(".ast-container").on("click", ".claim-btn", function (e) {
-        e.stopPropagation();
-        var deviceId = $(this).data("deviceid");
-        var serviceURL = "/temp-controller-agent/enrollment/claim?username=" + currentUser;
-        var deviceIdentifier = {id: deviceId, type: "TemperatureController"};
-        invokerUtil.put(serviceURL, deviceIdentifier, function (message) {
-            console.log(message);
-        }, function (message) {
-            console.log(message.content);
-        });
+        html: true,
+        content: function () {
+            return $("#content-filter-types").html();
+        }
     });
 });
 
@@ -168,13 +149,13 @@ function toTitleCase(str) {
 
 function loadDevices(searchType, searchParam) {
     var serviceURL;
-    if (groupName && groupOwner && $.hasPermission("LIST_OWN_DEVICES")) {
-        serviceURL = "/api/device-mgt/v1.0/groups/owner/" + groupOwner + "/name/" + groupName + "/devices";
+    if (groupId && $.hasPermission("LIST_OWN_DEVICES")) {
+        serviceURL = "/api/device-mgt/v1.0/groups/id/" + groupId + "/devices";
     } else if ($.hasPermission("LIST_DEVICES")) {
         serviceURL = "/api/device-mgt/v1.0/devices";
-    } else if ($.hasPermission("LIST_OWN_DEVICES")) {
+    } else if (permissionsUtil.hasPermission("LIST_OWN_DEVICES")) {
         //Get authenticated users devices
-        serviceURL = "/api/device-mgt/v1.0/users/devices?username=" + currentUser;
+        serviceURL = "/api/device-mgt/v1.0/devices?username=" + currentUser;
     } else {
         $("#loading-content").remove();
         $('#device-table').addClass('hidden');
@@ -227,20 +208,52 @@ function loadDevices(searchType, searchParam) {
         return type;
     }
 
+    function analyticsEnabled(type) {
+        var deviceTypes = deviceListing.data("deviceTypes");
+        for (var i = 0; i < deviceTypes.length; i++) {
+            if (deviceTypes[i].type == type) {
+                var analyticsEnabled = deviceTypes[i].analyticsEnabled;
+                if (analyticsEnabled == undefined) {
+                    // By default it should be enabled
+                    return true;
+                }
+                // In JS Boolean("false") returns TRUE => http://stackoverflow.com/a/264037/1560536
+                return (analyticsEnabled == "true");
+            }
+        }
+        return true;
+    }
+
+    function groupingEnabled(type) {
+        var deviceTypes = deviceListing.data("deviceTypes");
+        for (var i = 0; i < deviceTypes.length; i++) {
+            if (deviceTypes[i].type == type) {
+                var groupingEnabled = deviceTypes[i].groupingEnabled;
+                if (groupingEnabled == undefined) {
+                    // By default it should be enabled
+                    return true;
+                }
+                // In JS Boolean("false") returns TRUE => http://stackoverflow.com/a/264037/1560536
+                return (groupingEnabled == "true");
+            }
+        }
+        return true;
+    }
+
     var columns = [
         {
             targets: 0,
             data: 'name',
-            class: 'remove-padding icon-only content-fill',
+            class: 'remove-padding icon-only content-fill viewEnabledIcon',
             render: function (data, type, row, meta) {
-                return '<div class="thumbnail icon"><img class="square-element text fw " src="' + getDeviceTypeThumb(
-                        row.deviceType) + '"/></div>';
+                return '<div class="thumbnail icon"><img class="square-element text fw " src="'
+                    + getDeviceTypeThumb(row.deviceType) + '"/></div>';
             }
         },
         {
             targets: 1,
             data: 'name',
-            class: 'fade-edge',
+            class: 'viewEnabledIcon',
             render: function (name, type, row, meta) {
                 var model = getPropertyValue(row.properties, 'DEVICE_MODEL');
                 var vendor = getPropertyValue(row.properties, 'VENDOR');
@@ -251,19 +264,20 @@ function loadDevices(searchType, searchParam) {
                 return html;
             }
         },
-        {targets: 2,
+        {
+            targets: 2,
             data: 'user',
-            class: 'fade-edge remove-padding-top',
+            class: 'remove-padding-top viewEnabledIcon'
         },
         {
             targets: 3,
             data: 'status',
-            class: 'fade-edge remove-padding-top',
+            class: 'remove-padding-top viewEnabledIcon',
             render: function (status, type, row, meta) {
                 var html;
                 switch (status) {
                     case 'ACTIVE' :
-                        html = '<span><i class="fw fw-ok icon-success"></i> Active</span>';
+                        html = '<span><i class="fw fw-success icon-success"></i> Active</span>';
                         break;
                     case 'INACTIVE' :
                         html = '<span><i class="fw fw-warning icon-warning"></i> Inactive</span>';
@@ -274,6 +288,9 @@ function loadDevices(searchType, searchParam) {
                     case 'REMOVED' :
                         html = '<span><i class="fw fw-delete icon-danger"></i> Removed</span>';
                         break;
+                    case 'UNREACHABLE' :
+                        html = '<span><i class="fw fw-warning icon-warning"></i> Unreachable</span>';
+                        break;
                 }
                 return html;
             }
@@ -281,7 +298,7 @@ function loadDevices(searchType, searchParam) {
         {
             targets: 4,
             data: 'deviceType',
-            class: 'fade-edge remove-padding-top',
+            class: 'remove-padding-top viewEnabledIcon',
             render: function (status, type, row, meta) {
                 return getDeviceTypeLabel(row.deviceType);
             }
@@ -289,10 +306,10 @@ function loadDevices(searchType, searchParam) {
         {
             targets: 5,
             data: 'ownership',
-            class: 'fade-edge remove-padding-top',
+            class: 'remove-padding-top viewEnabledIcon',
             render: function (status, type, row, meta) {
                 if (getDeviceTypeCategory(row.deviceType) == 'mobile') {
-                    return row.enrolmentInfo.ownership;
+                    return row.ownership;
                 } else {
                     return null;
                 }
@@ -301,53 +318,61 @@ function loadDevices(searchType, searchParam) {
         {
             targets: 6,
             data: 'status',
-            class: 'text-right content-fill text-left-on-grid-view no-wrap',
+            class: 'text-right content-fill text-left-on-grid-view no-wrap tooltip-overflow-fix',
             render: function (status, type, row, meta) {
                 var deviceType = row.deviceType;
                 var deviceIdentifier = row.deviceIdentifier;
                 var html = '<span></span>';
+                var statURL = $("#device-listing").data("analitics-url");
                 if (status != 'REMOVED') {
-                    html =
-                        '<a href="device/' + deviceType + '?id=' + deviceIdentifier + '" data-click-event="remove-form"'
-                        +
-                        ' class="btn padding-reduce-on-grid-view"><span class="fw-stack"><i class="fw fw-ring fw-stack-2x"></i>'
-                        +
-                        '<i class="fw fw-view fw-stack-1x"></i></span><span class="hidden-xs hidden-on-grid-view">View</span></a>';
-                    html += '<a href="device/' + deviceType + '/analytics?deviceId=' + deviceIdentifier + '&deviceName='
-                            + row.name + '" ' +
-                            'data-click-event="remove-form" class="btn padding-reduce-on-grid-view"><span class="fw-stack">'
-                            +
-                            '<i class="fw fw-ring fw-stack-2x"></i><i class="fw fw-statistics fw-stack-1x"></i></span>'
-                            +
-                            '<span class="hidden-xs hidden-on-grid-view">Analytics</span>';
+                    html = '';
 
-                    if (!groupName || !groupOwner) {
+                    if (analyticsEnabled(row.deviceType)) {
+
+
+                        html += '<a href="' + statURL  +
+                            deviceIdentifier + '&deviceName=' + row.name + '" ' + 'data-click-event="remove-form"' +
+                            ' class="btn padding-reduce-on-grid-view" data-placement="top" data-toggle="tooltip" data-original-title="Analytics"><span class="fw-stack">' +
+                            '<i class="fw fw-circle-outline fw-stack-2x"></i><i class="fw fw-statistics fw-stack-1x"></i></span>' +
+                            '<span class="hidden-xs hidden-on-grid-view">Analytics</span>';
+                    }
+
+                    if (!groupId && groupingEnabled(row.deviceType)) {
                         html +=
                             '<a href="#" data-click-event="remove-form" class="btn padding-reduce-on-grid-view group-device-link" '
                             +
                             'data-deviceid="' + deviceIdentifier + '" data-devicetype="' + deviceType
                             + '" data-devicename="' +
-                            row.name + '"><span class="fw-stack"><i class="fw fw-ring fw-stack-2x"></i>' +
-                            '<i class="fw fw-grouping fw-stack-1x"></i></span>' +
+                            row.name + '" data-placement="top" data-toggle="tooltip" data-original-title="Group"><span class="fw-stack"><i class="fw fw-circle-outline fw-stack-2x"></i>' +
+                            '<i class="fw fw-group fw-stack-1x"></i></span>' +
                             '<span class="hidden-xs hidden-on-grid-view">Group</span></a>';
                     }
 
                     html +=
                         '<a href="#" data-click-event="remove-form" class="btn padding-reduce-on-grid-view edit-device-link" '
-                        +
-                        'data-deviceid="' + deviceIdentifier + '" data-devicetype="' + deviceType
-                        + '" data-devicename="' + row.name + '">' +
-                        '<span class="fw-stack"><i class="fw fw-ring fw-stack-2x"></i>' +
-                        '<i class="fw fw-edit fw-stack-1x"></i></span>' +
-                        '<span class="hidden-xs hidden-on-grid-view">Edit</span></a>';
-                    html +=
-                        '<a href="#" data-click-event="remove-form" class="btn padding-reduce-on-grid-view remove-device-link" '
-                        +
-                        'data-deviceid="' + deviceIdentifier + '" data-devicetype="' + deviceType
-                        + '" data-devicename="' + row.name + '">' +
-                        '<span class="fw-stack"><i class="fw fw-ring fw-stack-2x"></i>' +
-                        '<i class="fw fw-delete fw-stack-1x"></i></span>' +
-                        '<span class="hidden-xs hidden-on-grid-view">Delete</span>';
+                        + 'data-deviceid="' + deviceIdentifier + '" data-devicetype="' + deviceType
+                        + '" data-devicename="' + row.name + '" data-placement="top" data-toggle="tooltip" data-original-title="Edit">'
+                        + '<span class="fw-stack"><i class="fw fw-circle-outline fw-stack-2x"></i>'
+                        + '<i class="fw fw-edit fw-stack-1x"></i></span>'
+                        + '<span class="hidden-xs hidden-on-grid-view">Edit</span></a>';
+                    var groupOwner = $('#group_owner').text();
+                    if (groupId && groupOwner != "wso2.system.user") {
+                        html +=
+                            '<a href="#" data-click-event="remove-form" class="btn padding-reduce-on-grid-view remove-device-link" '
+                            + 'data-deviceid="' + deviceIdentifier + '" data-devicetype="' + deviceType
+                            + '" data-devicename="' + row.name + '" data-placement="top" data-toggle="tooltip" data-original-title="Remove from group">'
+                            + '<span class="fw-stack"><i class="fw fw-circle-outline fw-stack-2x"></i>'
+                            + '<i class="fw fw-delete fw-stack-1x"></i></span>'
+                            + '<span class="hidden-xs hidden-on-grid-view">Remove from group</span>';
+                    } else {
+                        html +=
+                            '<a href="#" data-click-event="remove-form" class="btn padding-reduce-on-grid-view remove-device-link" '
+                            + 'data-deviceid="' + deviceIdentifier + '" data-devicetype="' + deviceType
+                            + '" data-devicename="' + row.name + '" data-placement="top" data-toggle="tooltip" data-original-title="Delete">'
+                            + '<span class="fw-stack"><i class="fw fw-circle-outline fw-stack-2x"></i>'
+                            + '<i class="fw fw-delete fw-stack-1x"></i></span>'
+                            + '<span class="hidden-xs hidden-on-grid-view">Delete</span>';
+                    }
                 }
                 return html;
             }
@@ -356,14 +381,15 @@ function loadDevices(searchType, searchParam) {
 
     var fnCreatedRow = function (row, data, dataIndex) {
         $(row).attr('data-type', 'selectable');
-        $(row).attr('data-deviceid', data.deviceIdentifier);
-        $(row).attr('data-devicetype', data.type);
-        var model = getPropertyValue(data.properties, 'DEVICE_MODEL');
-        var vendor = getPropertyValue(data.properties, 'VENDOR');
-        var owner = data.user;
-        var status = data.status;
-        var ownership = data.ownership;
-        var deviceType = data.type;
+        $(row).attr('data-deviceid', htmlspecialchars(data.deviceIdentifier));
+        $(row).attr('data-devicetype', htmlspecialchars(data.deviceType));
+        $(row).attr('data-url', context + '/device/' + htmlspecialchars(data.deviceType) + '?id=' + htmlspecialchars(data.deviceIdentifier));
+        var model = htmlspecialchars(getPropertyValue(data.properties, 'DEVICE_MODEL'));
+        var vendor = htmlspecialchars(getPropertyValue(data.properties, 'VENDOR'));
+        var owner = htmlspecialchars(data.user);
+        var status = htmlspecialchars(data.status);
+        var ownership = htmlspecialchars(data.ownership);
+        var deviceType = htmlspecialchars(data.deviceType);
         var category = getDeviceTypeCategory(deviceType);
         $.each($('td', row), function (colIndex) {
             switch (colIndex) {
@@ -396,6 +422,10 @@ function loadDevices(searchType, searchParam) {
             }
         });
     };
+
+    function htmlspecialchars(text) {
+        return jQuery('<div/>').text(text).html();
+    }
 
     var dataFilter = function (data) {
         data = JSON.parse(data);
@@ -435,6 +465,14 @@ function loadDevices(searchType, searchParam) {
             $('#device-grid').removeClass('hidden');
             $("#loading-content").remove();
             attachDeviceEvents();
+
+
+            // if ($('.advance-search').length < 1) {
+            //     $(this).closest('.dataTables_wrapper').find('div[id$=_filter] input')
+            //         .after('<a href="' + context + '/devices/search"' +
+            //             ' class="advance-search add-padding-3x">Advance Search</a>');
+            // }
+
         }, {
             "placeholder": "Search By Device Name",
             "searchKey": "name"
@@ -475,11 +513,11 @@ $(document).ready(function () {
 
     /* for device list sorting drop down */
     $(".ctrl-filter-type-switcher").popover({
-                                                html: true,
-                                                content: function () {
-                                                    return $("#content-filter-types").html();
-                                                }
-                                            });
+        html: true,
+        content: function () {
+            return $("#content-filter-types").html();
+        }
+    });
 
     /* for data tables*/
     $('[data-toggle="tooltip"]').tooltip();
@@ -487,17 +525,17 @@ $(document).ready(function () {
     $("[data-toggle=popover]").popover();
 
     $(".ctrl-filter-type-switcher").popover({
-                                                html: true,
-                                                content: function () {
-                                                    return $('#content-filter-types').html();
-                                                }
-                                            });
+        html: true,
+        content: function () {
+            return $('#content-filter-types').html();
+        }
+    });
 
     $('#nav').affix({
-                        offset: {
-                            top: $('header').height()
-                        }
-                    });
+        offset: {
+            top: $('header').height()
+        }
+    });
 
 });
 
@@ -528,8 +566,32 @@ function hidePopup() {
     $(modalPopupContent).html("");
     $(modalPopupContent).removeClass("operation-data");
     $(modalPopup).modal('hide');
-    $('body').removeClass('modal-open').css('padding-right','0px');
+    $('body').removeClass('modal-open').css('padding-right', '0px');
     $('.modal-backdrop').remove();
+}
+
+function markAlreadyAssignedGroups(deviceId, deviceType) {
+    var successCallback = function (data, textStatus, xhr) {
+        data = JSON.parse(data);
+        if (xhr.status == 200) {
+            if (data.length > 0) {
+                var selectedValues = [];
+                for (var i = 0; i < data.length; i++) {
+                    if (data[i].owner != "wso2.system.user") {
+                        selectedValues.push(data[i].id);
+                    }
+                }
+                $("#groups").val(selectedValues).trigger("change");
+            }
+        } else {
+            displayErrors(xhr);
+        }
+    };
+
+    invokerUtil.get("/api/device-mgt/v1.0/groups/device?deviceId=" + deviceId + "&deviceType=" + deviceType,
+        successCallback, function (message) {
+            displayErrors(message);
+        });
 }
 
 /**
@@ -549,32 +611,57 @@ function attachDeviceEvents() {
             $(modalPopupContent).html($('#group-device-modal-content').html());
             $('#user-groups').html(
                 '<div style="height:100px" data-state="loading" data-loading-text="Loading..." data-loading-style="icon-only" data-loading-inverse="true"></div>');
-            $("a#group-device-yes-link").hide();
+            $("a#group-device-update-link").hide();
             showPopup();
 
             var serviceURL;
             if ($.hasPermission("LIST_ALL_GROUPS")) {
-                serviceURL = "/api/device-mgt/v1.0/groups/all";
+                serviceURL = "/api/device-mgt/v1.0/admin/groups?limit=100";
             } else if ($.hasPermission("LIST_GROUPS")) {
                 //Get authenticated users groups
-                serviceURL = "/api/device-mgt/v1.0/groups/user/" + currentUser + "/all";
+                serviceURL = "/api/device-mgt/v1.0/groups?limit=100";
             }
 
             invokerUtil.get(serviceURL, function (data) {
+                $("a#group-device-add-link").hide();
                 var groups = JSON.parse(data);
-                var str = '<br /><select id="assign-group-selector" style="color:#3f3f3f;padding:5px;width:250px;">';
-                for (var i = 0; i < groups.length; i++) {
-                    str += '<option value="' + groups[i].owner + "/name/" + groups[i].name + '">' +
-                           groups[i].name + '</option>';
+                var html = '';
+                var hasGroups = false;
+                for (var i = 0; i < groups.deviceGroups.length; i++) {
+                    if (groups.deviceGroups[i].owner != "wso2.system.user") {
+                        html += '<option value="' + groups.deviceGroups[i].id + '">' + groups.deviceGroups[i].name + '</option>';
+                        hasGroups = true;
+                    }
                 }
-                str += '</select>';
-                $('#user-groups').html(str);
-                $("a#group-device-yes-link").show();
-                $("a#group-device-yes-link").click(function () {
-                    var selectedGroup = $('#assign-group-selector').val();
-                    serviceURL = "/api/device-mgt/v1.0/groups/owner/" + selectedGroup + "/devices";
-                    var device = {"id": deviceId, "type": deviceType};
-                    invokerUtil.post(serviceURL, device, function (data) {
+                if (hasGroups) {
+                    html = '<br/><h4>Please select device group(s)</h4><br/>' +
+                        '<div class="wr-input-control">' +
+                        '<select id="groups" class="form-control select2" multiple="multiple">' +
+                        html + '</select></div>';
+                    markAlreadyAssignedGroups(deviceId, deviceType);
+                    $("a#group-device-update-link").show();
+                    $("a#group-add-link").hide();
+                } else {
+                    $("a#group-device-update-link").hide();
+                    $("a#group-add-link").show();
+                    html += '<br/><h4>You don\'t have any existing device groups. Please add new device group first.</h4>'
+                }
+                $('#user-groups').html(html);
+                $("select.select2[multiple=multiple]").select2({
+                    tags: false
+                });
+                $("a#group-device-update-link").click(function () {
+                    var deviceIdentifier = {"id": deviceId, "type": deviceType};
+                    var deviceGroupIds = $("#groups").val();
+                    if (!deviceGroupIds) {
+                        deviceGroupIds = [];
+                    }
+                    var deviceToGroupsAssignment = {
+                        deviceIdentifier: deviceIdentifier,
+                        deviceGroupIds: deviceGroupIds
+                    };
+                    serviceURL = "/api/device-mgt/v1.0/groups/device/assign";
+                    invokerUtil.post(serviceURL, deviceToGroupsAssignment, function (data) {
                         $(modalPopupContent).html($('#group-associate-device-200-content').html());
                         setTimeout(function () {
                             hidePopup();
@@ -608,23 +695,43 @@ function attachDeviceEvents() {
      * on Device Management page in WSO2 MDM Console.
      */
     $("a.remove-device-link").click(function () {
+        var deviceIdentifiers = [];
         var deviceId = $(this).data("deviceid");
         var deviceType = $(this).data("devicetype");
-        var serviceURL = "/api/device-mgt/v1.0/devices/type/" + deviceType + "/id/" + deviceId;
+
+        if (deviceId && deviceType) {
+            deviceIdentifiers = [{"id": deviceId, "type": deviceType}];
+        } else {
+            deviceIdentifiers = getSelectedDevices();
+        }
+
+        if (deviceIdentifiers.length == 0) {
+            $(modalPopupContent).html($('#no-device-selected').html());
+            $("a#no-device-selected-link").click(function () {
+                hidePopup();
+            });
+            showPopup();
+            return;
+        }
 
         $(modalPopupContent).html($('#remove-device-modal-content').html());
         showPopup();
 
         $("a#remove-device-yes-link").click(function () {
-            invokerUtil.delete(serviceURL, function (message) {
-                $(modalPopupContent).html($('#remove-device-200-content').html());
-                setTimeout(function () {
-                    hidePopup();
-                    location.reload(false);
-                }, 2000);
-            }, function (message) {
-                displayDeviceErrors(jqXHR);
-            });
+            if (groupId) {
+                var serviceURL = "/api/device-mgt/v1.0/groups/id/" + groupId + "/devices/remove";
+                invokerUtil.post(serviceURL, deviceIdentifiers, function (message) {
+                    $(modalPopupContent).html($('#remove-device-200-content').html());
+                    setTimeout(function () {
+                        hidePopup();
+                        location.reload(false);
+                    }, 2000);
+                }, function (jqXHR) {
+                    displayDeviceErrors(jqXHR);
+                });
+            } else {
+                removeDevices(deviceIdentifiers);
+            }
         });
 
         $("a#remove-device-cancel-link").click(function () {
@@ -641,7 +748,7 @@ function attachDeviceEvents() {
         var deviceId = $(this).data("deviceid");
         var deviceType = $(this).data("devicetype");
         var deviceName = $(this).data("devicename");
-        var serviceURL = "/api/device-mgt/v1.0/devices/type/" + deviceType + "/id/" + deviceId;
+        var serviceURL = "/api/device-mgt/v1.0/devices/type/" + deviceType + "/id/" + deviceId + "/rename";
 
         $(modalPopupContent).html($('#edit-device-modal-content').html());
         $('#edit-device-name').val(deviceName);
@@ -649,13 +756,15 @@ function attachDeviceEvents() {
 
         $("a#edit-device-yes-link").click(function () {
             var newDeviceName = $('#edit-device-name').val();
-            invokerUtil.put(serviceURL, {"name": newDeviceName}, function (message) {
+            var request = {};
+            request['name'] = newDeviceName;
+            invokerUtil.post(serviceURL, request, function (message) {
                 $(modalPopupContent).html($('#edit-device-200-content').html());
                 setTimeout(function () {
                     hidePopup();
                     location.reload(false);
                 }, 2000);
-            }, function (message) {
+            }, function (jqXHR) {
                 displayDeviceErrors(jqXHR);
             });
         });
@@ -663,6 +772,106 @@ function attachDeviceEvents() {
         $("a#edit-device-cancel-link").click(function () {
             hidePopup();
         });
+    });
+
+    /**
+     * Following click function would execute
+     * when a user clicks on "Add to Group" link
+     * on Device Management page in WSO2 devicemgt Console.
+     */
+    $("a.add-devices-to-group-link").click(function () {
+        $("a#group-device-update-link").hide();
+        var deviceIdentifiers = getSelectedDevices();
+        if (deviceIdentifiers.length == 0) {
+            $(modalPopupContent).html($('#no-device-selected').html());
+            $("a#no-device-selected-link").click(function () {
+                hidePopup();
+            });
+            showPopup();
+            return;
+        }
+
+        $(modalPopupContent).html($('#group-device-modal-content').html());
+        $('#user-groups').html(
+            '<div style="height:100px" data-state="loading" data-loading-text="Loading..." data-loading-style="icon-only" data-loading-inverse="true"></div>');
+        $("a#group-device-add-link").hide();
+        showPopup();
+
+        var serviceURL;
+        if ($.hasPermission("LIST_ALL_GROUPS")) {
+            serviceURL = "/api/device-mgt/v1.0/admin/groups?limit=100";
+        } else if ($.hasPermission("LIST_GROUPS")) {
+            //Get authenticated users groups
+            serviceURL = "/api/device-mgt/v1.0/groups?limit=100";
+        }
+
+        invokerUtil.get(serviceURL, function (data) {
+            var groups = JSON.parse(data);
+            var html = '';
+            var hasGroups = false;
+            for (var i = 0; i < groups.deviceGroups.length; i++) {
+                if (groups.deviceGroups[i].owner != "wso2.system.user") {
+                    html += '<option value="' + groups.deviceGroups[i].id + '">' +
+                        groups.deviceGroups[i].name + '</option>';
+                    hasGroups = true;
+                }
+            }
+            if (hasGroups) {
+                html = '<br /><select id="assign-group-selector" style="color:#3f3f3f;padding:5px;width:250px;">' +
+                    html + '</select>';
+                $("a#group-add-link").hide();
+                $("a#group-device-add-link").show();
+            } else {
+                html += '<br/><h4>You don\'t have any existing device groups. Please add new device group first.</h4>';
+                $("a#group-add-link").show();
+                $("a#group-device-add-link").hide();
+            }
+            $('#user-groups').html(html);
+            $("a#group-device-add-link").click(function () {
+                var selectedGroup = $('#assign-group-selector').val();
+                serviceURL = "/api/device-mgt/v1.0/groups/id/" + selectedGroup + "/devices/add";
+                invokerUtil.post(serviceURL, deviceIdentifiers, function (data) {
+                    $(modalPopupContent).html($('#group-associate-device-200-content').html());
+                    setTimeout(function () {
+                        hidePopup();
+                        location.reload(false);
+                    }, 2000);
+                }, function (jqXHR) {
+                    displayDeviceErrors(jqXHR);
+                });
+            });
+        }, function (jqXHR) {
+            if (jqXHR.status == 404) {
+                $(modalPopupContent).html($('#group-404-content').html());
+                $("a#cancel-link").click(function () {
+                    hidePopup();
+                });
+            } else {
+                displayDeviceErrors(jqXHR);
+            }
+        });
+
+        $("a#group-device-cancel-link").click(function () {
+            hidePopup();
+        });
+    });
+}
+
+function removeDevices(deviceIdentifiers) {
+    var serviceURL = "/api/device-mgt/v1.0/devices/type/" + deviceIdentifiers[0].type + "/id/" + deviceIdentifiers[0].id;
+    invokerUtil.delete(serviceURL, function (message) {
+        if (deviceIdentifiers.length > 1) {
+            deviceIdentifiers.slice(1, deviceIdentifiers.length);
+            removeDevices(deviceIdentifiers);
+        } else {
+            $(modalPopupContent).html($('#remove-device-200-content').html());
+            setTimeout(function () {
+                hidePopup();
+                location.reload(false);
+            }, 2000);
+        }
+    }, function (jqXHR) {
+        displayDeviceErrors(jqXHR);
     });
 }
 
@@ -697,4 +906,24 @@ function getParameterByName(name) {
     var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
         results = regex.exec(location.search);
     return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
+}
+
+/*
+ * Function to get selected devices.
+ */
+function getSelectedDevices() {
+    var deviceList = [];
+    var thisTable = $(".DTTT_selected").closest('.dataTables_wrapper').find('.dataTable').dataTable();
+    thisTable.api().rows().every(function () {
+        if ($(this.node()).hasClass('DTTT_selected')) {
+            deviceList.push(
+                {
+                    "id": $(thisTable.api().row(this).node()).data('deviceid'),
+                    "type": $(thisTable.api().row(this).node()).data('devicetype')
+                }
+            );
+        }
+    });
+
+    return deviceList;
 }

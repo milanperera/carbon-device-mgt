@@ -17,15 +17,25 @@
  */
 package org.wso2.carbon.device.mgt.core.service;
 
-import org.wso2.carbon.device.mgt.common.*;
+import org.wso2.carbon.device.mgt.common.Device;
+import org.wso2.carbon.device.mgt.common.DeviceIdentifier;
+import org.wso2.carbon.device.mgt.common.DeviceManagementException;
+import org.wso2.carbon.device.mgt.common.EnrolmentInfo;
+import org.wso2.carbon.device.mgt.common.FeatureManager;
+import org.wso2.carbon.device.mgt.common.InvalidDeviceException;
+import org.wso2.carbon.device.mgt.common.MonitoringOperation;
+import org.wso2.carbon.device.mgt.common.PaginationRequest;
+import org.wso2.carbon.device.mgt.common.PaginationResult;
 import org.wso2.carbon.device.mgt.common.configuration.mgt.PlatformConfiguration;
 import org.wso2.carbon.device.mgt.common.license.mgt.License;
 import org.wso2.carbon.device.mgt.common.operation.mgt.Activity;
 import org.wso2.carbon.device.mgt.common.operation.mgt.Operation;
 import org.wso2.carbon.device.mgt.common.operation.mgt.OperationManagementException;
+import org.wso2.carbon.device.mgt.common.policy.mgt.PolicyMonitoringManager;
+import org.wso2.carbon.device.mgt.common.push.notification.NotificationStrategy;
 
-import java.util.HashMap;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 
 /**
@@ -73,7 +83,7 @@ public interface DeviceManagementProviderService {
      */
     PaginationResult getAllDevices(PaginationRequest request) throws DeviceManagementException;
 
-    void sendEnrolmentInvitation(EmailMetaInfo metaInfo) throws DeviceManagementException;
+    void sendEnrolmentInvitation(String templateName, EmailMetaInfo metaInfo) throws DeviceManagementException;
 
     void sendRegistrationEmail(EmailMetaInfo metaInfo) throws DeviceManagementException;
 
@@ -118,6 +128,16 @@ public interface DeviceManagementProviderService {
      *                                   device list
      */
     List<Device> getDevicesOfUser(String userName) throws DeviceManagementException;
+
+    /**
+     * This method returns the list of device owned by a user of given device type.
+     *
+     * @param userName   user name.
+     * @param deviceType device type name
+     * @return
+     * @throws DeviceManagementException
+     */
+    List<Device> getDevicesOfUser(String userName, String deviceType) throws DeviceManagementException;
 
     /**
      * Method to get the list of devices owned by users of a particular user-role.
@@ -192,12 +212,20 @@ public interface DeviceManagementProviderService {
      * This method is used to check whether the device is enrolled with the give user.
      *
      * @param deviceId identifier of the device that needs to be checked against the user.
-     * @param user username of the device owner.
-     *
+     * @param user     username of the device owner.
      * @return true if the user owns the device else will return false.
      * @throws DeviceManagementException If some unusual behaviour is observed while fetching the device.
      */
     boolean isEnrolled(DeviceIdentifier deviceId, String user) throws DeviceManagementException;
+
+    /**
+     * This method is used to get notification strategy for given device type
+     *
+     * @param deviceType Device type
+     * @return Notification Strategy for device type
+     * @throws DeviceManagementException
+     */
+    NotificationStrategy getNotificationStrategyByDeviceType(String deviceType) throws DeviceManagementException;
 
     License getLicense(String deviceType, String languageCode) throws DeviceManagementException;
 
@@ -219,6 +247,13 @@ public interface DeviceManagementProviderService {
 
     boolean setActive(DeviceIdentifier deviceId, boolean status) throws DeviceManagementException;
 
+    /**
+     * Returns the device of specified id.
+     *
+     * @param deviceId device Id
+     * @return Device returns null when device is not avaialble.
+     * @throws DeviceManagementException
+     */
     Device getDevice(DeviceIdentifier deviceId) throws DeviceManagementException;
 
     Device getDevice(DeviceIdentifier deviceId, Date since) throws DeviceManagementException;
@@ -275,4 +310,22 @@ public interface DeviceManagementProviderService {
 
     int getActivityCountUpdatedAfter(long timestamp) throws OperationManagementException;
 
+    List<MonitoringOperation> getMonitoringOperationList(String deviceType);
+
+    int getDeviceMonitoringFrequency(String deviceType);
+
+    boolean isDeviceMonitoringEnabled(String deviceType);
+
+    PolicyMonitoringManager getPolicyMonitoringManager(String deviceType);
+
+    /**
+     * Change device status.
+     *
+     * @param deviceIdentifier {@link DeviceIdentifier} object
+     * @param newStatus        New status of the device
+     * @return Whether status is changed or not
+     * @throws DeviceManagementException on errors while trying to change device status
+     */
+    boolean changeDeviceStatus(DeviceIdentifier deviceIdentifier, EnrolmentInfo.Status newStatus)
+            throws DeviceManagementException;
 }

@@ -24,7 +24,6 @@ import org.apache.catalina.LifecycleListener;
 import org.apache.catalina.core.StandardContext;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.wso2.carbon.apimgt.api.model.API;
 import org.wso2.carbon.apimgt.webapp.publisher.APIConfig;
 import org.wso2.carbon.apimgt.webapp.publisher.APIPublisherService;
 import org.wso2.carbon.apimgt.webapp.publisher.APIPublisherUtil;
@@ -32,6 +31,8 @@ import org.wso2.carbon.apimgt.webapp.publisher.config.APIResourceConfiguration;
 import org.wso2.carbon.apimgt.webapp.publisher.config.WebappPublisherConfig;
 import org.wso2.carbon.apimgt.webapp.publisher.internal.APIPublisherDataHolder;
 import org.wso2.carbon.apimgt.webapp.publisher.lifecycle.util.AnnotationProcessor;
+import org.wso2.carbon.context.PrivilegedCarbonContext;
+import org.wso2.carbon.user.api.UserStoreException;
 
 import javax.servlet.ServletContext;
 import java.io.IOException;
@@ -57,31 +58,24 @@ public class APIPublisherLifecycleListener implements LifecycleListener {
             boolean isManagedApi = (param != null && !param.isEmpty()) && Boolean.parseBoolean(param);
 
             String profile = System.getProperty(PROPERTY_PROFILE);
-
             if (WebappPublisherConfig.getInstance().getProfiles().getProfile().contains(profile.toLowerCase())
                     && isManagedApi) {
                 try {
                     AnnotationProcessor annotationProcessor = new AnnotationProcessor(context);
-                    Set<String> annotatedAPIClasses = annotationProcessor.
-                            scanStandardContext(org.wso2.carbon.apimgt.annotations.api.API.class.getName());
-
+                    Set<String> annotatedSwaggerAPIClasses = annotationProcessor.
+                            scanStandardContext(io.swagger.annotations.SwaggerDefinition.class.getName());
                     List<APIResourceConfiguration> apiDefinitions = annotationProcessor.extractAPIInfo(servletContext,
-                            annotatedAPIClasses);
-
+                            annotatedSwaggerAPIClasses);
                     for (APIResourceConfiguration apiDefinition : apiDefinitions) {
-
                         APIConfig apiConfig = APIPublisherUtil.buildApiConfig(servletContext, apiDefinition);
-
+                        APIPublisherUtil.setResourceAuthTypes(servletContext,apiConfig);
                         try {
                             int tenantId = APIPublisherDataHolder.getInstance().getTenantManager().
                                     getTenantId(apiConfig.getTenantDomain());
 
                             boolean isTenantActive = APIPublisherDataHolder.getInstance().
                                     getTenantManager().isTenantActive(tenantId);
-
                             if (isTenantActive) {
-                                apiConfig.init();
-                                API api = APIPublisherUtil.getAPI(apiConfig);
                                 boolean isServerStarted = APIPublisherDataHolder.getInstance().isServerStarted();
                                 if (isServerStarted) {
                                     APIPublisherService apiPublisherService =
@@ -90,13 +84,13 @@ public class APIPublisherLifecycleListener implements LifecycleListener {
                                         throw new IllegalStateException(
                                                 "API Publisher service is not initialized properly");
                                     }
-                                    apiPublisherService.publishAPI(api);
+                                    apiPublisherService.publishAPI(apiConfig);
                                 } else {
                                     if (log.isDebugEnabled()) {
                                         log.debug("Server has not started yet. Hence adding API '" +
-                                                api.getId().getApiName() + "' to the queue");
+                                                apiConfig.getName() + "' to the queue");
                                     }
-                                    APIPublisherDataHolder.getInstance().getUnpublishedApis().push(api);
+                                    APIPublisherDataHolder.getInstance().getUnpublishedApis().push(apiConfig);
                                 }
                             } else {
                                 log.error("No tenant [" + apiConfig.getTenantDomain() + "] " +
@@ -112,14 +106,14 @@ public class APIPublisherLifecycleListener implements LifecycleListener {
                     log.error("Error encountered while discovering annotated classes", e);
                 } catch (ClassNotFoundException e) {
                     log.error("Error while scanning class for annotations", e);
+                } catch (UserStoreException e) {
+                    log.error("Error while retrieving tenant admin user for the tenant domain"
+                                      + PrivilegedCarbonContext.getThreadLocalCarbonContext().getTenantDomain(), e);
+                } catch (Throwable e) {
+                    // This is done to stop tomcat failure if a webapp failed to publish apis.
+                    log.error("Failed to Publish api from " + servletContext.getContextPath(), e);
                 }
             }
         }
     }
-
-    //TODO : Need to implemented, to merge API Definitions in cases where implementation of an API Lies in two classes
-    private List<APIResourceConfiguration> mergeAPIDefinitions(List<APIResourceConfiguration> inputList) {
-        return null;
-    }
-
 }

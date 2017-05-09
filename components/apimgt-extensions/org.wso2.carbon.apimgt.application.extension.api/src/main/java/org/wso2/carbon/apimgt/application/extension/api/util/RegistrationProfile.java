@@ -30,17 +30,14 @@ import javax.xml.bind.annotation.XmlRootElement;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class RegistrationProfile {
-
     @XmlElement(required = true)
     private String applicationName;
     @XmlElement(required = true)
     private String tags[];
     @XmlElement(required = true)
     private boolean isAllowedToAllDomains;
-    @XmlElement(required = true)
-    private boolean isMappingAnExistingOAuthApp;
-    private String consumerKey;
-    private String consumerSecret;
+    @XmlElement(required = false)
+    private String validityPeriod;
 
     public String getApplicationName() {
         return applicationName;
@@ -66,27 +63,11 @@ public class RegistrationProfile {
         this.isAllowedToAllDomains = isAllowedToAllDomains;
     }
 
-    public boolean isMappingAnExistingOAuthApp() {
-        return isMappingAnExistingOAuthApp;
+    public String getValidityPeriod() {
+        return validityPeriod;
     }
 
-    public void setIsMappingAnExistingOAuthApp(boolean isMappingAnExistingOAuthApp) {
-        this.isMappingAnExistingOAuthApp = isMappingAnExistingOAuthApp;
-    }
-
-    public String getConsumerKey() {
-        return consumerKey;
-    }
-
-    public void setConsumerKey(String consumerKey) {
-        this.consumerKey = consumerKey;
-    }
-
-    public String getConsumerSecret() {
-        return consumerSecret;
-    }
-
-    public void setConsumerSecret(String consumerSecret) {
-        this.consumerSecret = consumerSecret;
+    public void setValidityPeriod(String validityPeriod) {
+        this.validityPeriod = validityPeriod;
     }
 }

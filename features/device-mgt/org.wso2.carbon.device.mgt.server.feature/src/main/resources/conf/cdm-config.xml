@@ -25,12 +25,27 @@
             </JndiLookupDefinition>
         </DataSourceConfiguration>
     </ManagementRepository>
+<<<<<<< HEAD
     <PushNotificationProviders>
         <Provider>org.wso2.carbon.device.mgt.extensions.push.notification.provider.gcm.GCMBasedPushNotificationProvider</Provider>
         <!--<Provider>org.wso2.carbon.device.mgt.mobile.impl.ios.apns.APNSBasedPushNotificationProvider</Provider>-->
         <!--<Provider>org.wso2.carbon.device.mgt.extensions.push.notification.provider.mqtt.MQTTBasedPushNotificationProvider</Provider>-->
         <!--<Provider>org.wso2.carbon.device.mgt.extensions.push.notification.provider.xmpp.XMPPBasedPushNotificationProvider</Provider>-->
     </PushNotificationProviders>
+=======
+    <PushNotificationConfiguration>
+        <SchedulerBatchSize>1000</SchedulerBatchSize>
+        <SchedulerBatchDelayMills>60000</SchedulerBatchDelayMills>
+        <SchedulerTaskInitialDelay>60000</SchedulerTaskInitialDelay>
+        <SchedulerTaskEnabled>true</SchedulerTaskEnabled>
+        <PushNotificationProviders>
+            <Provider>org.wso2.carbon.device.mgt.extensions.push.notification.provider.fcm.FCMBasedPushNotificationProvider</Provider>
+            <!--<Provider>org.wso2.carbon.device.mgt.mobile.impl.ios.apns.APNSBasedPushNotificationProvider</Provider>-->
+            <Provider>org.wso2.carbon.device.mgt.extensions.push.notification.provider.mqtt.MQTTBasedPushNotificationProvider</Provider>
+            <Provider>org.wso2.carbon.device.mgt.extensions.push.notification.provider.xmpp.XMPPBasedPushNotificationProvider</Provider>
+        </PushNotificationProviders>
+    </PushNotificationConfiguration>
+>>>>>>> 964eae6f92d87baed3557b4f72bebe4bd5b4d832
     <IdentityConfiguration>
         <ServerUrl>https://localhost:9443</ServerUrl>
         <AdminUsername>admin</AdminUsername>
@@ -43,46 +58,19 @@
         <MaxRetries>5</MaxRetries>
         <MinRetriesToMarkUnreachable>8</MinRetriesToMarkUnreachable>
         <MinRetriesToMarkInactive>20</MinRetriesToMarkInactive>
-        <Platforms>
-            <Platform>android</Platform>
-            <Platform>ios</Platform>
-            <Platform>windows</Platform>
-        </Platforms>
+        <!--Set the policy evaluation point name-->
+        <!--Simple ->  Simple policy evaluation point-->
+        <!--Merged ->  Merged policy evaluation point -->
+        <PolicyEvaluationPoint>Simple</PolicyEvaluationPoint>
     </PolicyConfiguration>
-    <TaskConfiguration>
-        <Enable>true</Enable>
-        <Frequency>600000</Frequency>
-        <TaskClass>org.wso2.carbon.device.mgt.core.task.impl.DeviceDetailsRetrieverTask</TaskClass>
-        <Operations>
-            <Operation>
-                <Name>DEVICE_INFO</Name>
-                <RecurrentTimes>1</RecurrentTimes>
-                <Platforms>
-                    <platform>android</platform>
-                    <platform>ios</platform>
-                </Platforms>
-            </Operation>
-            <Operation>
-                <Name>APPLICATION_LIST</Name>
-                <RecurrentTimes>5</RecurrentTimes>
-                <Platforms>
-                    <platform>android</platform>
-                    <platform>ios</platform>
-                </Platforms>
-            </Operation>
-            <Operation>
-                <Name>DEVICE_LOCATION</Name>
-                <RecurrentTimes>1</RecurrentTimes>
-                <Platforms>
-                    <platform>android</platform>
-                    <platform>ios</platform>
-                </Platforms>
-            </Operation>
-        </Operations>
-    </TaskConfiguration>
+    <!--<TaskConfiguration>-->
+        <!--<Enable>true</Enable>-->
+        <!--<Frequency>600000</Frequency>-->
+    <!--</TaskConfiguration>-->
     <!-- Default Page size configuration for paginated DM APIs-->
     <PaginationConfiguration>
         <DeviceListPageSize>20</DeviceListPageSize>
+        <GroupListPageSize>20</GroupListPageSize>
         <NotificationListPageSize>20</NotificationListPageSize>
         <ActivityListPageSize>20</ActivityListPageSize>
         <OperationListPageSize>20</OperationListPageSize>

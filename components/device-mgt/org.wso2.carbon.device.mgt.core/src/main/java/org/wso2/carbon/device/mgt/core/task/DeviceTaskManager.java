@@ -19,18 +19,16 @@
 
 package org.wso2.carbon.device.mgt.core.task;
 
-import java.util.List;
-
 public interface DeviceTaskManager {
 
-    /**
-     * This method will get the operation list from configurations.
-     *
-     * @return - list of Task Operations.
-     * @throws DeviceMgtTaskException
-     */
-    List<TaskOperation> getOperationList() throws DeviceMgtTaskException;
-
+//    /**
+//     * This method will get the operation list from configurations.
+//     *
+//     * @return - list of Task Operations.
+//     * @throws DeviceMgtTaskException
+//     */
+//    List<MonitoringOperation> getOperationList(String deviceType)
+//            throws DeviceMgtTaskException;
 
     /**
      * This method will take the monitoring frequency.
@@ -39,12 +37,12 @@ public interface DeviceTaskManager {
      */
     int getTaskFrequency() throws DeviceMgtTaskException;
 
-    /**
-     * This method will return the task clazz from configurations.
-     * @return - Fully qualified class name.
-     * @throws DeviceMgtTaskException
-     */
-    String getTaskImplementedClazz() throws DeviceMgtTaskException;
+//    /**
+//     * This method will return the task clazz from configurations.
+//     * @return - Fully qualified class name.
+//     * @throws DeviceMgtTaskException
+//     */
+//    String getTaskImplementedClazz() throws DeviceMgtTaskException;
 
     /**
      * This method checks wheather task is enabled in config file.
@@ -61,12 +59,12 @@ public interface DeviceTaskManager {
     void addOperations() throws DeviceMgtTaskException;
 
 
-    /**
-     * This method will return the operation names which should be added in each iterations.
-     * @return
-     * @throws DeviceMgtTaskException
-     */
-    List<String> getValidOperationNames() throws DeviceMgtTaskException;
+//    /**
+//     * This method will return the operation names which should be added in each iterations.
+//     * @return
+//     * @throws DeviceMgtTaskException
+//     */
+//    List<String> getValidOperationNames(String deviceType) throws DeviceMgtTaskException;
 
     /**
      * This method will check wheather give operation is added by the task.

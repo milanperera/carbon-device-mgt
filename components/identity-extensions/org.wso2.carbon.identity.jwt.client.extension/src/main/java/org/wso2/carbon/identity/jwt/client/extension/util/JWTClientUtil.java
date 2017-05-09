@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
+ * Copyright (c) 2016-2017, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
  *
  * WSO2 Inc. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
@@ -48,14 +48,24 @@ import org.wso2.carbon.registry.core.service.RegistryService;
 import org.wso2.carbon.registry.core.service.TenantRegistryLoader;
 import org.wso2.carbon.utils.CarbonUtils;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URL;
-import java.security.*;
+import java.security.KeyManagementException;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
 import java.security.interfaces.RSAPrivateKey;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 /**
@@ -69,6 +79,10 @@ public class JWTClientUtil {
 	private static final String JWT_CONFIG_FILE_NAME = "jwt.properties";
 	private static final String SUPERTENANT_JWT_CONFIG_LOCATION =
 			CarbonUtils.getEtcCarbonConfigDirPath() + File.separator + JWT_CONFIG_FILE_NAME;
+    /**
+     * This is added for the carbon authenticator.
+     */
+    public static final String SIGNED_JWT_AUTH_USERNAME = "Username";
 
 	/**
 	 * Return a http client instance
@@ -195,8 +209,12 @@ public class JWTClientUtil {
 
 	public static String generateSignedJWTAssertion(String username, JWTConfig jwtConfig, boolean isDefaultJWTClient)
 			throws JWTClientException {
+		return generateSignedJWTAssertion(username, jwtConfig, isDefaultJWTClient, null);
+	}
+
+	public static String generateSignedJWTAssertion(String username, JWTConfig jwtConfig, boolean isDefaultJWTClient,
+			Map<String, String> customClaims) throws JWTClientException {
 		try {
-			String subject = username;
 			long currentTimeMillis = System.currentTimeMillis();
 			// add the skew between servers
 			String iss = jwtConfig.getIssuer();
@@ -218,18 +236,24 @@ public class JWTClientUtil {
 			claimsSet.setIssueTime(new Date(iat));
 			claimsSet.setExpirationTime(new Date(exp));
 			claimsSet.setIssuer(iss);
-			claimsSet.setSubject(username);
-			claimsSet.setNotBeforeTime(new Date(nbf));
+            claimsSet.setSubject(username);
+            claimsSet.setNotBeforeTime(new Date(nbf));
 			claimsSet.setJWTID(jti);
 			claimsSet.setAudience(aud);
+            claimsSet.setClaim(SIGNED_JWT_AUTH_USERNAME, username);
+            if (customClaims != null && !customClaims.isEmpty()) {
+                for (String key : customClaims.keySet()) {
+                    claimsSet.setClaim(key, customClaims.get(key));
+                }
+            }
 
 			// get Keystore params
 			String keyStorePath = jwtConfig.getKeyStorePath();
 			String privateKeyAlias = jwtConfig.getPrivateKeyAlias();
 			String privateKeyPassword = jwtConfig.getPrivateKeyPassword();
 			KeyStore keyStore;
-			RSAPrivateKey rsaPrivateKey = null;
-			if (keyStorePath != null && !keyStorePath.isEmpty()) {
+			RSAPrivateKey rsaPrivateKey;
+			if (!isDefaultJWTClient && (keyStorePath != null && !keyStorePath.isEmpty())) {
 				String keyStorePassword = jwtConfig.getKeyStorePassword();
 				keyStore = loadKeyStore(new File(keyStorePath), keyStorePassword, "JKS");
 				rsaPrivateKey = (RSAPrivateKey) keyStore.getKey(privateKeyAlias, privateKeyPassword.toCharArray());
@@ -243,11 +267,16 @@ public class JWTClientUtil {
 					String jksName = ksName + ".jks";
 					rsaPrivateKey = (RSAPrivateKey) tenantKeyStoreManager.getPrivateKey(jksName, tenantDomain);
 				} else {
-					PrivilegedCarbonContext.startTenantFlow();
-					PrivilegedCarbonContext.getThreadLocalCarbonContext().setTenantId(MultitenantConstants.SUPER_TENANT_ID);
-					KeyStoreManager tenantKeyStoreManager = KeyStoreManager.getInstance(MultitenantConstants.SUPER_TENANT_ID);
-					rsaPrivateKey = (RSAPrivateKey) tenantKeyStoreManager.getDefaultPrivateKey();
-					PrivilegedCarbonContext.endTenantFlow();
+					try {
+						PrivilegedCarbonContext.startTenantFlow();
+						PrivilegedCarbonContext.getThreadLocalCarbonContext()
+								.setTenantId(MultitenantConstants.SUPER_TENANT_ID);
+						KeyStoreManager tenantKeyStoreManager = KeyStoreManager
+								.getInstance(MultitenantConstants.SUPER_TENANT_ID);
+						rsaPrivateKey = (RSAPrivateKey) tenantKeyStoreManager.getDefaultPrivateKey();
+					} finally {
+						PrivilegedCarbonContext.endTenantFlow();
+					}
 				}
 			}
 			JWSSigner signer = new RSASSASigner(rsaPrivateKey);

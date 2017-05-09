@@ -103,6 +103,14 @@ $.fn.datatables_extended_serverside_paging = function (settings, url, dataFilter
             fnCreatedRow: fnCreatedRow,
             "fnDrawCallback": fnDrawCallback,
             initComplete: function () {
+
+                //loading tooltips
+                if (typeof $.fn.tooltip == 'function') {
+                    $('[data-toggle="tooltip"]').tooltip();
+                } else {
+                    console.warn('Warning : Dependency missing - Bootstrap Tooltip Library');
+                }
+
                 this.api().columns().every(function () {
 
                     var column = this;
@@ -273,6 +281,7 @@ $.fn.datatables_extended_serverside_paging = function (settings, url, dataFilter
                         thisTable.removeClass("table-selectable");
                         $(button).addClass("active").html('Select');
                         $(button).parent().next().children().addClass("disabled");
+                        $('.DTTT_selected.selected').removeClass(rowSelectedClass);
                         // EMM related function
                         $(document).on('click', '.viewEnabledIcon', InitiateViewOption);
                         //--- End of EMM related codes

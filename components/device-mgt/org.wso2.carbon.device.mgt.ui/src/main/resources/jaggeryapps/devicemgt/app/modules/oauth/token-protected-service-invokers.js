@@ -117,14 +117,43 @@ var invokers = function () {
         log.debug("Response status : " + xmlHttpRequest.status);
         log.debug("Response payload if any : " + xmlHttpRequest.responseText);
 
-        if (xmlHttpRequest.status == 401 && (xmlHttpRequest.responseText == TOKEN_EXPIRED ||
-                                             xmlHttpRequest.responseText == TOKEN_INVALID ) && count < 5) {
-            tokenUtil.refreshTokenPair();
-            return privateMethods.execute(httpMethod, requestPayload, endpoint, responseCallback, ++count, headers);
-        } else {
+        if (xmlHttpRequest.status == 401) {
+            if ((xmlHttpRequest.responseText == TOKEN_EXPIRED ||
+                xmlHttpRequest.responseText == TOKEN_INVALID ) && count < 5) {
+                tokenUtil.refreshTokenPair();
+                return privateMethods.execute(httpMethod, requestPayload, endpoint, responseCallback, ++count, headers);
+            } else if (privateMethods.isInvalidCredential(xmlHttpRequest.responseText)) {
+                tokenUtil.refreshTokenPair();
+                return privateMethods.execute(httpMethod, requestPayload, endpoint, responseCallback, ++count, headers);
+            }
+         } else {
             return responseCallback(xmlHttpRequest);
-        }
+         }
     };
+
+
+    /**
+     * This method verify whether the access token is expired using response payload.
+     * This is required when using API gateway.
+     * @param responsePayload response payload.
+     * return true if it is invalid otherwise false.
+     */
+    privateMethods["isInvalidCredential"] =
+        function (responsePayload) {
+            if (responsePayload) {
+                try {
+                    payload = parse(responsePayload);
+                    if (payload["fault"]["code"] == 900901) {
+                        log.debug("Access token is invalid: " + payload["fault"]["code"]);
+                        log.debug(payload["fault"]["description"]);
+                        return true;
+                    }
+                } catch (err) {
+                    // do nothing
+                }
+            }
+            return false;
+        };
 
     /**
      * This method add Oauth authentication header to outgoing XML-HTTP Requests if Oauth authentication is enabled.
@@ -301,6 +330,7 @@ var invokers = function () {
             var Header = Packages.org.apache.commons.httpclient.Header;
             var contentTypeFound = false;
             var acceptTypeFound = false;
+            var acceptTypeValue = constants["APPLICATION_JSON"];
             for (var i in headers) {
                 var header = new Header();
                 header.setName(headers[i].name);
@@ -312,6 +342,7 @@ var invokers = function () {
                 }
                 if(constants["ACCEPT_IDENTIFIER"] == headers[i].name){
                     acceptTypeFound = true;
+                    acceptTypeValue = headers[i].value;
                 }
             }
 
@@ -356,10 +387,8 @@ var invokers = function () {
                 client.executeMethod(httpMethodObject);
                 //noinspection JSUnresolvedFunction
                 var status = httpMethodObject.getStatusCode();
-                if (status == 200) {
-                    var responseContentDispositionHeader = httpMethodObject.getResponseHeader(
-                        constants["CONTENT_DISPOSITION_IDENTIFIER"]);
-                    if (responseContentDispositionHeader) {
+                if (status >= 200 && status < 300) {
+                    if (constants["STREAMING_FILES_ACCEPT_HEADERS"].indexOf(acceptTypeValue) > -1) {
                         return successCallback(httpMethodObject.getResponseBodyAsStream(),
                                                httpMethodObject.getResponseHeaders());
                     } else {

@@ -25,11 +25,10 @@ import org.wso2.carbon.device.mgt.common.DeviceIdentifier;
 import org.wso2.carbon.device.mgt.common.InvalidDeviceException;
 import org.wso2.carbon.device.mgt.common.operation.mgt.Operation;
 import org.wso2.carbon.device.mgt.common.operation.mgt.OperationManagementException;
-import org.wso2.carbon.device.mgt.common.operation.mgt.OperationManager;
 import org.wso2.carbon.device.mgt.core.operation.mgt.CommandOperation;
-import org.wso2.carbon.device.mgt.core.operation.mgt.OperationManagerImpl;
 import org.wso2.carbon.device.mgt.core.operation.mgt.OperationMgtConstants;
-import org.wso2.carbon.policy.mgt.common.Policy;
+import org.wso2.carbon.device.mgt.common.policy.mgt.Policy;
+import org.wso2.carbon.policy.mgt.common.PolicyAdministratorPoint;
 import org.wso2.carbon.policy.mgt.common.PolicyEvaluationException;
 import org.wso2.carbon.policy.mgt.common.PolicyManagementException;
 import org.wso2.carbon.policy.mgt.core.PolicyManagerService;
@@ -45,8 +44,9 @@ public class PolicyEnforcementDelegatorImpl implements PolicyEnforcementDelegato
     private static final Log log = LogFactory.getLog(PolicyEnforcementDelegatorImpl.class);
 
     private List<Device> devices;
+    private List<Integer> updatedPolicyIds;
 
-    public PolicyEnforcementDelegatorImpl(List<Device> devices) {
+    public PolicyEnforcementDelegatorImpl(List<Device> devices, List<Integer> updatedPolicyIds) {
 
         log.info("Policy re-enforcing stared due to change of the policies.");
 
@@ -57,6 +57,7 @@ public class PolicyEnforcementDelegatorImpl implements PolicyEnforcementDelegato
             }
         }
         this.devices = devices;
+        this.updatedPolicyIds = updatedPolicyIds;
 
     }
 
@@ -67,12 +68,22 @@ public class PolicyEnforcementDelegatorImpl implements PolicyEnforcementDelegato
             identifier.setId(device.getDeviceIdentifier());
             identifier.setType(device.getType());
 
+            Policy devicePolicy = this.getAppliedPolicyToDevice(identifier);
             Policy policy = this.getEffectivePolicy(identifier);
             List<DeviceIdentifier> deviceIdentifiers = new ArrayList<>();
             deviceIdentifiers.add(identifier);
             if (policy != null) {
-                this.addPolicyRevokeOperation(deviceIdentifiers);
-                this.addPolicyOperation(deviceIdentifiers, policy);
+                 /*
+                We add policy operation for the device if,
+                    1) Device does not have any policy or
+                    2) New Policy or
+                    3) Device existing policy has changed
+                 */
+                if (devicePolicy == null || devicePolicy.getId() != policy.getId() || updatedPolicyIds.contains
+                        (policy.getId())) {
+                    this.addPolicyRevokeOperation(deviceIdentifiers);
+                    this.addPolicyOperation(deviceIdentifiers, policy);
+                }
             } else {
                 //This means all the applicable policies have been removed from device. Hence calling a policy revoke.
                 this.addPolicyRevokeOperation(deviceIdentifiers);
@@ -84,7 +95,17 @@ public class PolicyEnforcementDelegatorImpl implements PolicyEnforcementDelegato
     public Policy getEffectivePolicy(DeviceIdentifier identifier) throws PolicyDelegationException {
         try {
             PolicyManagerService policyManagerService = new PolicyManagerServiceImpl();
-            return policyManagerService.getPEP().getEffectivePolicy(identifier);
+            PolicyAdministratorPoint policyAdministratorPoint;
+
+            Policy policy = policyManagerService.getPEP().getEffectivePolicy(identifier);
+            policyAdministratorPoint = policyManagerService.getPAP();
+            if (policy != null) {
+                policyAdministratorPoint.setPolicyUsed(identifier, policy);
+            } else {
+                policyAdministratorPoint.removePolicyUsed(identifier);
+                return null;
+            }
+            return policy;
             //return PolicyManagementDataHolder.getInstance().getPolicyEvaluationPoint().getEffectivePolicy(identifier);
         } catch (PolicyEvaluationException e) {
             String msg = "Error occurred while retrieving the effective policy for devices.";
@@ -144,5 +165,23 @@ public class PolicyEnforcementDelegatorImpl implements PolicyEnforcementDelegato
         policyRevokeOperation.setCode(OperationMgtConstants.OperationCodes.POLICY_REVOKE);
         policyRevokeOperation.setType(Operation.Type.COMMAND);
         return policyRevokeOperation;
+    }
+
+    /**
+     * Provides the applied policy for give device
+     *
+     * @param identifier Device Identifier
+     * @return Applied Policy
+     * @throws PolicyDelegationException exception throws when retrieving applied policy for given device
+     */
+    public Policy getAppliedPolicyToDevice(DeviceIdentifier identifier) throws PolicyDelegationException {
+        try {
+            PolicyManagerService policyManagerService = new PolicyManagerServiceImpl();
+            return policyManagerService.getAppliedPolicyToDevice(identifier);
+        } catch (PolicyManagementException e) {
+            String msg = "Error occurred while retrieving the applied policy for devices.";
+            log.error(msg, e);
+            throw new PolicyDelegationException(msg, e);
+        }
     }
 }

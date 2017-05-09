@@ -21,17 +21,19 @@ package org.wso2.carbon.device.mgt.common;
 import java.util.Date;
 
 /**
- * This class holds required parameters for a querying a paginated response.
+ * This class holds required parameters for a querying a paginated device response.
  */
 public class PaginationRequest {
 
     private int startIndex;
     private int rowCount;
+    private int groupId;
     private String owner;
     private String status;
     private String deviceType;
     private String deviceName;
     private String ownership;
+    private String ownerRole;
     private Date since;
 
     public PaginationRequest(int start, int rowCount) {
@@ -53,6 +55,14 @@ public class PaginationRequest {
 
     public void setRowCount(int rowCount) {
         this.rowCount = rowCount;
+    }
+
+    public int getGroupId() {
+        return groupId;
+    }
+
+    public void setGroupId(int groupId) {
+        this.groupId = groupId;
     }
 
     public String getOwner() {
@@ -103,4 +113,11 @@ public class PaginationRequest {
         this.since = since;
     }
 
+    public String getOwnerRole() {
+        return ownerRole;
+    }
+
+    public void setOwnerRole(String ownerRole) {
+        this.ownerRole = ownerRole;
+    }
 }

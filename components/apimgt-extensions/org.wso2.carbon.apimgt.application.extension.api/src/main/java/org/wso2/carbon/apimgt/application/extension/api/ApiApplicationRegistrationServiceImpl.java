@@ -18,6 +18,7 @@
 
 package org.wso2.carbon.apimgt.application.extension.api;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.json.simple.JSONObject;
@@ -29,6 +30,7 @@ import org.wso2.carbon.apimgt.application.extension.dto.ApiApplicationKey;
 import org.wso2.carbon.apimgt.application.extension.exception.APIManagerException;
 import org.wso2.carbon.base.MultitenantConstants;
 import org.wso2.carbon.context.PrivilegedCarbonContext;
+import org.wso2.carbon.device.mgt.common.DeviceManagementException;
 import org.wso2.carbon.user.api.UserStoreException;
 
 import javax.ws.rs.DELETE;
@@ -36,6 +38,7 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Response;
+import java.util.Arrays;
 
 
 public class ApiApplicationRegistrationServiceImpl implements ApiApplicationRegistrationService {
@@ -58,11 +61,12 @@ public class ApiApplicationRegistrationServiceImpl implements ApiApplicationRegi
             }
             String username = PrivilegedCarbonContext.getThreadLocalCarbonContext().getUserRealm()
                     .getRealmConfiguration().getAdminUserName();
-            username = username + "@" + APIUtil.getTenantDomainOftheUser();
             PrivilegedCarbonContext.getThreadLocalCarbonContext().setUsername(username);
             APIManagementProviderService apiManagementProviderService = APIUtil.getAPIManagementProviderService();
             ApiApplicationKey apiApplicationKey = apiManagementProviderService.generateAndRetrieveApplicationKeys(
-                    applicationName, ApiApplicationConstants.DEFAULT_TOKEN_TYPE, username, false);
+                    applicationName, APIUtil.getDefaultTags(),
+                    ApiApplicationConstants.DEFAULT_TOKEN_TYPE, username, false,
+                    ApiApplicationConstants.DEFAULT_VALIDITY_PERIOD);
             return Response.status(Response.Status.CREATED).entity(apiApplicationKey.toString()).build();
         } catch (APIManagerException e) {
             String msg = "Error occurred while registering an application '" + applicationName + "'";
@@ -70,6 +74,10 @@ public class ApiApplicationRegistrationServiceImpl implements ApiApplicationRegi
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(msg).build();
         } catch (UserStoreException e) {
             String msg = "Failed to retrieve the tenant" + tenantDomain + "'";
+            log.error(msg, e);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(msg).build();
+        } catch (DeviceManagementException e) {
+            String msg = "Failed to retrieve the device service";
             log.error(msg, e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(msg).build();
         } finally {
@@ -81,49 +89,46 @@ public class ApiApplicationRegistrationServiceImpl implements ApiApplicationRegi
     @POST
     public Response register(RegistrationProfile registrationProfile) {
         try {
-            String username = APIUtil.getAuthenticatedUser() + "@" + APIUtil.getTenantDomainOftheUser();
+            if (registrationProfile.getTags() == null || registrationProfile.getTags().length == 0) {
+                return Response.status(Response.Status.NOT_ACCEPTABLE).entity("Tags should not be empty").build();
+            }
+            if (!APIUtil.getAllowedApisTags().containsAll(Arrays.asList(registrationProfile.getTags()))) {
+                return Response.status(Response.Status.NOT_ACCEPTABLE).entity("APIs(Tags) are not allowed to this user."
+                ).build();
+            }
+            PrivilegedCarbonContext.getThreadLocalCarbonContext().setUsername(PrivilegedCarbonContext.
+                    getThreadLocalCarbonContext().getUserRealm().getRealmConfiguration().getAdminUserName());
+            String username = APIUtil.getAuthenticatedUser();
             APIManagementProviderService apiManagementProviderService = APIUtil.getAPIManagementProviderService();
-            if (registrationProfile.isMappingAnExistingOAuthApp()) {
-                JSONObject jsonStringObject = new JSONObject();
-                jsonStringObject.put(ApiApplicationConstants.JSONSTRING_USERNAME_TAG, username);
-                jsonStringObject.put(ApiApplicationConstants.JSONSTRING_KEY_TYPE_TAG,
-                                     ApiApplicationConstants.DEFAULT_TOKEN_TYPE);
-                jsonStringObject.put(ApiApplicationConstants.OAUTH_CLIENT_ID, registrationProfile.getConsumerKey());
-                jsonStringObject.put(ApiApplicationConstants.OAUTH_CLIENT_SECRET,
-                                     registrationProfile.getConsumerSecret());
-                jsonStringObject.put(ApiApplicationConstants.JSONSTRING_VALIDITY_PERIOD_TAG,
-                                     ApiApplicationConstants.DEFAULT_VALIDITY_PERIOD);
-                apiManagementProviderService.registerExistingOAuthApplicationToAPIApplication(
-                        jsonStringObject.toJSONString(), registrationProfile.getApplicationName(),
-                        registrationProfile.getConsumerKey(), username, registrationProfile.isAllowedToAllDomains(),
-                        ApiApplicationConstants.DEFAULT_TOKEN_TYPE, registrationProfile.getTags());
-                return Response.status(Response.Status.ACCEPTED).entity("true").build();
+            String validityPeriod;
+            if (registrationProfile.getValidityPeriod() == null) {
+                validityPeriod  =  ApiApplicationConstants.DEFAULT_VALIDITY_PERIOD;
             } else {
+                validityPeriod = registrationProfile.getValidityPeriod();
+            }
+
+            String applicationName = registrationProfile.getApplicationName();
+            synchronized (ApiApplicationRegistrationServiceImpl.class) {
                 ApiApplicationKey apiApplicationKey = apiManagementProviderService.generateAndRetrieveApplicationKeys(
-                        registrationProfile.getApplicationName(), registrationProfile.getTags(),
-                        ApiApplicationConstants.DEFAULT_TOKEN_TYPE, username, false);
+                        applicationName, registrationProfile.getTags(),
+                        ApiApplicationConstants.DEFAULT_TOKEN_TYPE, username,
+                        registrationProfile.isAllowedToAllDomains(), validityPeriod);
                 return Response.status(Response.Status.CREATED).entity(apiApplicationKey.toString()).build();
             }
         } catch (APIManagerException e) {
-            String msg = "Error occurred while registering an application '"
-                    + registrationProfile.getApplicationName() + "'";
+            String msg = "Error occurred while registering an application with apis '"
+                    + StringUtils.join(registrationProfile.getTags(), ",") + "'";
             log.error(msg, e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("false").build();
-        }
-    }
-
-    @Path("unregister")
-    @DELETE
-    public Response unregister(@QueryParam("applicationName") String applicationName) {
-        try {
-            String username = APIUtil.getAuthenticatedUser() + "@" + APIUtil.getTenantDomainOftheUser();
-            APIManagementProviderService apiManagementProviderService = APIUtil.getAPIManagementProviderService();
-            apiManagementProviderService.removeAPIApplication(applicationName, username);
-            return Response.status(Response.Status.ACCEPTED).build();
-        } catch (APIManagerException e) {
-            String msg = "Error occurred while removing the application '" + applicationName;
+        } catch (DeviceManagementException e) {
+            String msg = "Failed to retrieve the device service";
+            log.error(msg, e);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(msg).build();
+        } catch (UserStoreException e) {
+            String msg = "Failed to access user space.";
             log.error(msg, e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(msg).build();
         }
     }
+
 }

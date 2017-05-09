@@ -18,25 +18,59 @@
  */
 package org.wso2.carbon.device.mgt.jaxrs.service.api.admin;
 
-import io.swagger.annotations.*;
-import org.wso2.carbon.apimgt.annotations.api.API;
-import org.wso2.carbon.apimgt.annotations.api.Permission;
+import io.swagger.annotations.SwaggerDefinition;
+import io.swagger.annotations.Info;
+import io.swagger.annotations.ExtensionProperty;
+import io.swagger.annotations.Extension;
+import io.swagger.annotations.Tag;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
+import io.swagger.annotations.ResponseHeader;
+import org.wso2.carbon.apimgt.annotations.api.Scope;
+import org.wso2.carbon.apimgt.annotations.api.Scopes;
 import org.wso2.carbon.device.mgt.common.Device;
 import org.wso2.carbon.device.mgt.jaxrs.beans.ErrorResponse;
+import org.wso2.carbon.device.mgt.jaxrs.util.Constants;
 
 import javax.validation.constraints.Size;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-@API(name = "DeviceManagementAdmin", version = "1.0.0", context = "/api/device-mgt/v1.0/admin/devices",
-        tags = {"device_management"})
+@SwaggerDefinition(
+        info = @Info(
+                version = "1.0.0",
+                title = "",
+                extensions = {
+                        @Extension(properties = {
+                                @ExtensionProperty(name = "name", value = "DeviceManagementAdmin"),
+                                @ExtensionProperty(name = "context", value = "/api/device-mgt/v1.0/admin/devices"),
+                        })
+                }
+        ),
+        tags = {
+                @Tag(name = "device_management", description = "")
+        }
+)
 @Path("/admin/devices")
 @Api(value = "Device Management Administrative Service", description = "This an  API intended to be used by " +
         "'internal' components to log in as an admin user and do a selected number of operations. " +
         "Further, this is strictly restricted to admin users only ")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
+@Scopes(
+        scopes = {
+                @Scope(
+                        name = "Getting Details of a Device",
+                        description = "Getting Details of a Device",
+                        key = "perm:admin:devices:view",
+                        permissions = {"/device-mgt/devices/owning-device/view"}
+                )
+        }
+)
 public interface DeviceManagementAdminService {
 
     @GET
@@ -47,7 +81,13 @@ public interface DeviceManagementAdminService {
             notes = "Get the details of a device by searching via the device name, device type and the tenant domain.",
             response = Device.class,
             responseContainer = "List",
-            tags = "Device Management Administrative Service")
+            tags = "Device Management Administrative Service",
+            extensions = {
+                    @Extension(properties = {
+                            @ExtensionProperty(name = Constants.SCOPE, value = "perm:admin:devices:view")
+                    })
+            }
+    )
     @ApiResponses(value = {
             @ApiResponse(code = 200, message = "OK. \n Successfully fetched the list of devices.",
                     response = Device.class,
@@ -67,7 +107,8 @@ public interface DeviceManagementAdminService {
                     }),
             @ApiResponse(
                     code = 304,
-                    message = "Not Modified. Empty body because the client already has the latest version of the requested resource.\n"),
+                    message = "Not Modified. Empty body because the client already has the latest version of the " +
+                            "requested resource.\n"),
             @ApiResponse(
                     code = 401,
                     message = "Unauthorized.\n The unauthorized access to the requested resource.",
@@ -84,20 +125,19 @@ public interface DeviceManagementAdminService {
                     message = "Internal Server Error. \n Server error occurred while fetching the device list.",
                     response = ErrorResponse.class)
     })
-    @Permission(name = "View Devices", permission = "/device-mgt/devices/owning-device/view")
     Response getDevicesByName(
             @ApiParam(
                     name = "name",
-                    value = "The name of the device.If you are unsure of the name of the device, run the GET /devices API that is under Device Management.",
+                    value = "The name of the device.If you are unsure of the name of the device, run the GET /devices" +
+                            " API that is under Device Management.",
                     required = true)
             @QueryParam("name")
             @Size(max = 45)
             String name,
             @ApiParam(
                     name = "type",
-                    value = "The type of the device, such as android, ios or windows.",
-                    required = true,
-                    allowableValues = "android, ios, windows")
+                    value = "The device type name, such as ios, android, windows or fire-alarm.",
+                    required = true)
             @QueryParam("type")
             @Size(min = 2, max = 45)
             String type,
@@ -127,5 +167,4 @@ public interface DeviceManagementAdminService {
                     required = false,
                     defaultValue = "5")
             @QueryParam("limit") int limit);
-
 }

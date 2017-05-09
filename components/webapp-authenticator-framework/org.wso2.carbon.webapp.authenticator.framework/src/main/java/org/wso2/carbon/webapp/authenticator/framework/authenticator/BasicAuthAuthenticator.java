@@ -21,17 +21,26 @@ package org.wso2.carbon.webapp.authenticator.framework.authenticator;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
 import org.apache.catalina.util.Base64;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.tomcat.util.buf.ByteChunk;
 import org.apache.tomcat.util.buf.CharChunk;
 import org.apache.tomcat.util.buf.MessageBytes;
+import org.wso2.carbon.user.api.UserStoreException;
+import org.wso2.carbon.user.api.UserStoreManager;
+import org.wso2.carbon.utils.multitenancy.MultitenantUtils;
+import org.wso2.carbon.webapp.authenticator.framework.AuthenticationException;
+import org.wso2.carbon.webapp.authenticator.framework.AuthenticatorFrameworkDataHolder;
 import org.wso2.carbon.webapp.authenticator.framework.Constants;
 import org.wso2.carbon.webapp.authenticator.framework.AuthenticationInfo;
+import org.wso2.carbon.webapp.authenticator.framework.Utils.Utils;
 
 import java.util.Properties;
 
 public class BasicAuthAuthenticator implements WebappAuthenticator {
 
     private static final String BASIC_AUTH_AUTHENTICATOR = "BasicAuth";
+    private static final Log log = LogFactory.getLog(BasicAuthAuthenticator.class);
 
     @Override
     public void init() {
@@ -40,6 +49,9 @@ public class BasicAuthAuthenticator implements WebappAuthenticator {
 
     @Override
     public boolean canHandle(Request request) {
+        if (!isAuthenticationSupported(request)) {
+            return false;
+        }
         MessageBytes authorization =
                 request.getCoyoteRequest().getMimeHeaders().getValue(Constants.HTTPHeaders.HEADER_HTTP_AUTHORIZATION);
         if (authorization != null) {
@@ -54,7 +66,28 @@ public class BasicAuthAuthenticator implements WebappAuthenticator {
 
     @Override
     public AuthenticationInfo authenticate(Request request, Response response) {
-        return new AuthenticationInfo();
+        AuthenticationInfo authenticationInfo = new AuthenticationInfo();
+        Credentials credentials = getCredentials(request);
+        try {
+            int tenantId = Utils.getTenantIdOFUser(credentials.getUsername());
+            UserStoreManager userStore = AuthenticatorFrameworkDataHolder.getInstance().getRealmService().
+                    getTenantUserRealm(tenantId).getUserStoreManager();
+            String username = MultitenantUtils.getTenantAwareUsername(credentials.getUsername());
+            boolean authenticated = userStore.authenticate(username, credentials.getPassword());
+            if (authenticated) {
+                authenticationInfo.setStatus(Status.CONTINUE);
+                authenticationInfo.setUsername(username);
+                authenticationInfo.setTenantDomain(Utils.getTenantDomain(tenantId));
+                authenticationInfo.setTenantId(tenantId);
+            } else {
+                authenticationInfo.setStatus(Status.FAILURE);
+            }
+        } catch (UserStoreException e) {
+            log.error("Error occurred while authenticating the user." + credentials.getUsername(), e);
+        } catch (AuthenticationException e) {
+            log.error("Error occurred while obtaining the tenant Id for user." + credentials.getUsername(), e);
+        }
+        return authenticationInfo;
     }
 
     @Override
@@ -124,6 +157,11 @@ public class BasicAuthAuthenticator implements WebappAuthenticator {
         public String getPassword() {
             return password;
         }
+    }
+
+    private boolean isAuthenticationSupported(Request request) {
+        String param = request.getContext().findParameter("basicAuth");
+        return (param != null && Boolean.parseBoolean(param));
     }
 
 }

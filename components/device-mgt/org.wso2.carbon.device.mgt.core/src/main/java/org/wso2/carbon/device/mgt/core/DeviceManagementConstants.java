@@ -75,11 +75,24 @@ public final class DeviceManagementConstants {
         public static final String SERVER_BASE_URL_HTTPS = "base-url-https";
         public static final String SERVER_BASE_URL_HTTP = "base-url-http";
         public static final String DOWNLOAD_URL = "download-url";
+
+        public static final String USER_REGISTRATION_TEMPLATE = "user-registration";
+        public static final String USER_ENROLLMENT_TEMPLATE = "user-enrollment";
+        public static final String DEFAULT_ENROLLMENT_TEMPLATE = "default-enrollment-invitation";
     }
 
     public static final class OperationAttributes {
         private OperationAttributes() {throw new AssertionError(); }
         public static final String ACTIVITY = "ACTIVITY_";
+    }
+
+    public static final class PushNotifications {
+        private PushNotifications() {
+            throw new AssertionError();
+        }
+        public static final int DEFAULT_SCHEDULER_TASK_INITIAL_DELAY = 60000;
+        public static final int DEFAULT_BATCH_DELAY_MILLS = 60000;
+        public static final int DEFAULT_BATCH_SIZE = 1000;
     }
 
 }

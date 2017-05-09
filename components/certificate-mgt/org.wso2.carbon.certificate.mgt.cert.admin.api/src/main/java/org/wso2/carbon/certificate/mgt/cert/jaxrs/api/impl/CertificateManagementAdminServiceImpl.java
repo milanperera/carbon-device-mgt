@@ -1,3 +1,21 @@
+/*
+ * Copyright (c) 2016-2017, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
+ *
+ * WSO2 Inc. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 package org.wso2.carbon.certificate.mgt.cert.jaxrs.api.impl;
 
 import org.apache.commons.logging.Log;
@@ -6,25 +24,37 @@ import org.wso2.carbon.certificate.mgt.cert.jaxrs.api.CertificateManagementAdmin
 import org.wso2.carbon.certificate.mgt.cert.jaxrs.api.beans.CertificateList;
 import org.wso2.carbon.certificate.mgt.cert.jaxrs.api.beans.EnrollmentCertificate;
 import org.wso2.carbon.certificate.mgt.cert.jaxrs.api.beans.ErrorResponse;
+import org.wso2.carbon.certificate.mgt.cert.jaxrs.api.beans.ValidationResponse;
 import org.wso2.carbon.certificate.mgt.cert.jaxrs.api.util.CertificateMgtAPIUtils;
 import org.wso2.carbon.certificate.mgt.cert.jaxrs.api.util.RequestValidationUtil;
 import org.wso2.carbon.certificate.mgt.core.dto.CertificateResponse;
 import org.wso2.carbon.certificate.mgt.core.exception.CertificateManagementException;
 import org.wso2.carbon.certificate.mgt.core.exception.KeystoreException;
+import org.wso2.carbon.certificate.mgt.core.impl.CertificateGenerator;
+import org.wso2.carbon.certificate.mgt.core.scep.SCEPException;
+import org.wso2.carbon.certificate.mgt.core.scep.SCEPManager;
+import org.wso2.carbon.certificate.mgt.core.scep.TenantedDeviceWrapper;
 import org.wso2.carbon.certificate.mgt.core.service.CertificateManagementService;
 import org.wso2.carbon.certificate.mgt.core.service.PaginationResult;
 import org.wso2.carbon.context.PrivilegedCarbonContext;
+import org.wso2.carbon.device.mgt.common.DeviceIdentifier;
+import org.wso2.carbon.device.mgt.common.DeviceManagementConstants;
+import org.wso2.carbon.identity.jwt.client.extension.exception.JWTClientException;
+import org.wso2.carbon.identity.jwt.client.extension.service.JWTClientManagerService;
 
 import javax.ws.rs.*;
 import javax.ws.rs.core.Response;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Path("/admin/certificates")
 public class CertificateManagementAdminServiceImpl implements CertificateManagementAdminService {
 
     private static Log log = LogFactory.getLog(CertificateManagementAdminServiceImpl.class);
+    private static final String PROXY_AUTH_MUTUAL_HEADER = "proxy-mutual-auth-header";
 
     /**
      * Save a list of certificates and relevant information in the database.
@@ -138,4 +168,159 @@ public class CertificateManagementAdminServiceImpl implements CertificateManagem
         }
     }
 
+//    @POST
+//    @Path("/verify/ios")
+//    public Response verifyIOSCertificate(@ApiParam(name = "certificate", value = "Mdm-Signature of the " +
+//            "certificate that needs to be verified", required = true) EnrollmentCertificate certificate) {
+//        try {
+//            CertificateManagementService certMgtService = CertificateMgtAPIUtils.getCertificateManagementService();
+//            X509Certificate cert = certMgtService.extractCertificateFromSignature(certificate.getPem());
+//            String challengeToken = certMgtService.extractChallengeToken(cert);
+//
+//            if (challengeToken != null) {
+//                challengeToken = challengeToken.substring(challengeToken.indexOf("(") + 1).trim();
+//
+//                SCEPManager scepManager = CertificateMgtAPIUtils.getSCEPManagerService();
+//                DeviceIdentifier deviceIdentifier = new DeviceIdentifier();
+//                deviceIdentifier.setId(challengeToken);
+//                deviceIdentifier.setType(DeviceManagementConstants.MobileDeviceTypes.MOBILE_DEVICE_TYPE_IOS);
+//                TenantedDeviceWrapper tenantedDeviceWrapper = scepManager.getValidatedDevice(deviceIdentifier);
+//
+//                if (tenantedDeviceWrapper != null) {
+//                    return Response.status(Response.Status.OK).entity("valid").build();
+//                }
+//            }
+//        } catch (SCEPException e) {
+//            String msg = "Error occurred while extracting information from certificate.";
+//            log.error(msg, e);
+//            return Response.serverError().entity(
+//                    new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build()).build();
+//        } catch (KeystoreException e) {
+//            String msg = "Error occurred while converting PEM file to X509Certificate.";
+//            log.error(msg, e);
+//            return Response.serverError().entity(
+//                    new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build()).build();
+//        }
+//        return Response.status(Response.Status.OK).entity("invalid").build();
+//    }
+//
+//    @POST
+//    @Path("/verify/android")
+//    public Response verifyAndroidCertificate(@ApiParam(name = "certificate", value = "Base64 encoded .pem file of the " +
+//            "certificate that needs to be verified", required = true) EnrollmentCertificate certificate) {
+//        CertificateResponse certificateResponse = null;
+//        try {
+//            CertificateManagementService certMgtService = CertificateMgtAPIUtils.getCertificateManagementService();
+//            if (certificate.getSerial().toLowerCase().contains(PROXY_AUTH_MUTUAL_HEADER)) {
+//                certificateResponse = certMgtService.verifySubjectDN(certificate.getPem());
+//            } else {
+//                X509Certificate clientCertificate = certMgtService.pemToX509Certificate(certificate.getPem());
+//                if (clientCertificate != null) {
+//                    certificateResponse = certMgtService.verifyPEMSignature(clientCertificate);
+//                }
+//            }
+//
+//            if (certificateResponse != null && certificateResponse.getCommonName() != null && !certificateResponse
+//                    .getCommonName().isEmpty()) {
+//                return Response.status(Response.Status.OK).entity("valid").build();
+//            }
+//        } catch (KeystoreException e) {
+//            String msg = "Error occurred while converting PEM file to X509Certificate.";
+//            log.error(msg, e);
+//            return Response.serverError().entity(
+//                    new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build()).build();
+//        }
+//        return Response.status(Response.Status.OK).entity("invalid").build();
+//    }
+
+    @POST
+    @Path("/verify/{type}")
+    public Response verifyCertificate(@PathParam("type") String type, EnrollmentCertificate certificate) {
+        try {
+            CertificateManagementService certMgtService = CertificateMgtAPIUtils.getCertificateManagementService();
+
+            if (DeviceManagementConstants.MobileDeviceTypes.MOBILE_DEVICE_TYPE_IOS.equalsIgnoreCase(type)) {
+                X509Certificate cert = certMgtService.extractCertificateFromSignature(certificate.getPem());
+                String challengeToken = certMgtService.extractChallengeToken(cert);
+
+                if (challengeToken != null) {
+                    challengeToken = challengeToken.substring(challengeToken.indexOf("(") + 1).trim();
+
+                    SCEPManager scepManager = CertificateMgtAPIUtils.getSCEPManagerService();
+                    DeviceIdentifier deviceIdentifier = new DeviceIdentifier();
+                    deviceIdentifier.setId(challengeToken);
+                    deviceIdentifier.setType(DeviceManagementConstants.MobileDeviceTypes.MOBILE_DEVICE_TYPE_IOS);
+                    TenantedDeviceWrapper tenantedDeviceWrapper = scepManager.getValidatedDevice(deviceIdentifier);
+
+                    Map<String, String> claims = new HashMap<>();
+
+                    claims.put("http://wso2.org/claims/enduserTenantId",
+                            String.valueOf(tenantedDeviceWrapper.getTenantId()));
+                    claims.put("http://wso2.org/claims/enduser",
+                            tenantedDeviceWrapper.getDevice().getEnrolmentInfo().getOwner() + "@"
+                                    + tenantedDeviceWrapper.getTenantDomain());
+                    claims.put("http://wso2.org/claims/deviceIdentifier",
+                            tenantedDeviceWrapper.getDevice().getDeviceIdentifier());
+                    claims.put("http://wso2.org/claims/deviceIdType", tenantedDeviceWrapper.getDevice().getType());
+
+                    String jwdToken;
+                    try {
+                        PrivilegedCarbonContext.startTenantFlow();
+                        PrivilegedCarbonContext.getThreadLocalCarbonContext()
+                                .setTenantId(tenantedDeviceWrapper.getTenantId());
+                        PrivilegedCarbonContext.getThreadLocalCarbonContext()
+                                .setTenantDomain(tenantedDeviceWrapper.getTenantDomain());
+                        JWTClientManagerService jwtClientManagerService = CertificateMgtAPIUtils
+                                .getJwtClientManagerService();
+                        jwdToken = jwtClientManagerService.getJWTClient()
+                                .getJwtToken(tenantedDeviceWrapper.getDevice().getEnrolmentInfo().getOwner(), claims,
+                                        true);
+                    } finally {
+                        PrivilegedCarbonContext.endTenantFlow();
+                    }
+
+                    ValidationResponse validationResponse = new ValidationResponse();
+                    validationResponse.setDeviceId(challengeToken);
+                    validationResponse.setDeviceType(DeviceManagementConstants.MobileDeviceTypes.MOBILE_DEVICE_TYPE_IOS);
+                    validationResponse.setJWTToken(jwdToken);
+                    validationResponse.setTenantId(tenantedDeviceWrapper.getTenantId());
+
+                    return Response.status(Response.Status.OK).entity(validationResponse).build();
+                }
+            }
+
+            if (DeviceManagementConstants.MobileDeviceTypes.MOBILE_DEVICE_TYPE_ANDROID.equalsIgnoreCase(type)) {
+                CertificateResponse certificateResponse = null;
+                if (certificate.getSerial().toLowerCase().contains(PROXY_AUTH_MUTUAL_HEADER)) {
+                    certificateResponse = certMgtService.verifySubjectDN(certificate.getPem());
+                } else {
+                    X509Certificate clientCertificate = certMgtService.pemToX509Certificate(certificate.getPem());
+                    if (clientCertificate != null) {
+                        certificateResponse = certMgtService.verifyPEMSignature(clientCertificate);
+                    }
+                }
+
+                if (certificateResponse != null && certificateResponse.getCommonName() != null && !certificateResponse
+                        .getCommonName().isEmpty()) {
+                    return Response.status(Response.Status.OK).entity("valid").build();
+                }
+            }
+        } catch (SCEPException e) {
+            String msg = "Error occurred while extracting information from certificate.";
+            log.error(msg, e);
+            return Response.serverError().entity(
+                    new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build()).build();
+        } catch (KeystoreException e) {
+            String msg = "Error occurred while converting PEM file to X509Certificate.";
+            log.error(msg, e);
+            return Response.serverError().entity(
+                    new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build()).build();
+        } catch (JWTClientException e) {
+            String msg = "Error occurred while converting PEM file to X509Certificate.";
+            log.error(msg, e);
+            return Response.serverError().entity(
+                    new ErrorResponse.ErrorResponseBuilder().setCode(500l).setMessage(msg).build()).build();
+        }
+        return Response.status(Response.Status.OK).entity("invalid").build();
+    }
 }

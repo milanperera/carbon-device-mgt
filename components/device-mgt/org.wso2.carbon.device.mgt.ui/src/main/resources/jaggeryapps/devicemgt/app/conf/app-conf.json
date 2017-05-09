@@ -1,8 +1,9 @@
 {
-    "appName": "CDMF",
+    "appName": "WSO2 Device Cloud",
     "cachingEnabled": false,
     "debuggingEnabled": false,
     "permissionRoot": "/",
+    "portalURL": "https://${server.ip}:9445",
     "loginPage": "cdmf.page.sign-in",
     "adminServicesUrl": "https://${server.ip}:${server.https_port}/admin/services/",
     "authModule": {
@@ -10,7 +11,7 @@
         "login": {
             "onSuccess": {
                 "script": "/app/modules/login.js",
-                "page": "cdmf.page.dashboard"
+                "page": "cdmf.page.processing"
             },
             "onFail": {
                 "script": "/app/modules/login.js",
@@ -26,11 +27,11 @@
             }
         },
         "sso": {
-            "enabled": false,
+            "enabled": true,
             "issuer" : "devicemgt",
             "appName" : "devicemgt",
-            "identityProviderUrl" : "https://localhost:9443/samlsso",
-            "acs": "https://localhost:9443/devicemgt/uuf/sso/acs",
+            "identityProviderUrl" : "https://%iot.keymanager.host%:%iot.keymanager.https.port%/samlsso",
+            "acs": "https://%iot.manager.host%:%iot.manager.https.port%/devicemgt/uuf/sso/acs",
             "identityAlias": "wso2carbon",
             "responseSigningEnabled" : true,
             "validateAssertionValidityPeriod": true,
@@ -39,7 +40,6 @@
         }
     },
     "errorPages": {
-        "404": "cdmf.page.error-404",
         "default": "uuf.page.error"
     }
 }

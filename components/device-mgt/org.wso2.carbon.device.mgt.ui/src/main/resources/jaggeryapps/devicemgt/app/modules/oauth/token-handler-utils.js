@@ -22,6 +22,7 @@ var utils = function () {
     var deviceMgtProps = require("/app/modules/conf-reader/main.js")["conf"];
     var constants = require("/app/modules/constants.js");
     var carbon = require("carbon");
+	var authModule = require("/lib/modules/auth/auth.js").module;
 
     //noinspection JSUnresolvedVariable
     var Base64 = Packages.org.apache.commons.codec.binary.Base64;
@@ -80,14 +81,14 @@ var utils = function () {
         return dynamicClientAppCredentials;
     };
 
-    publicMethods["getTenantBasedClientAppCredentials"] = function (username, jwtToken) {
-        if (!username || !jwtToken) {
+    publicMethods["getTenantBasedClientAppCredentials"] = function (username) {
+        if (!username) {
             log.error("{/app/modules/oauth/token-handler-utils.js} Error in retrieving tenant " +
-                "based client app credentials. No username or jwt token is found " +
-                    "as input - getTenantBasedClientAppCredentials(x, y)");
+                "based client app credentials. No username " +
+                    "as input - getTenantBasedClientAppCredentials(x)");
             return null;
         } else {
-            //noinspection JSUnresolvedFunction, JSUnresolvedVariable
+			//noinspection JSUnresolvedFunction, JSUnresolvedVariable
             var tenantDomain = carbon.server.tenantDomain({username: username});
             if (!tenantDomain) {
                 log.error("{/app/modules/oauth/token-handler-utils.js} Error in retrieving tenant " +
@@ -100,8 +101,16 @@ var utils = function () {
                 if (cachedTenantBasedClientAppCredentials) {
                     return cachedTenantBasedClientAppCredentials;
                 } else {
+					var adminUsername = deviceMgtProps["adminUser"];
+					var adminUserTenantId = deviceMgtProps["adminUserTenantId"];
+					//claims required for jwtAuthenticator.
+					var claims = {"http://wso2.org/claims/enduserTenantId": adminUserTenantId,
+						"http://wso2.org/claims/enduser": adminUsername};
+					var jwtToken = publicMethods.getJwtToken(adminUsername, claims);
+
                     // register a tenant based client app at API Manager
-                    var applicationName = "webapp_" + tenantDomain;
+                    var applicationName =  deviceMgtProps["oauthProvider"]["appRegistration"]
+							["clientName"] + "_" + tenantDomain;
                     var requestURL = deviceMgtProps["oauthProvider"]["appRegistration"]
                         ["apiManagerClientAppRegistrationServiceURL"] +
                             "?tenantDomain=" + tenantDomain + "&applicationName=" + applicationName;
@@ -109,7 +118,7 @@ var utils = function () {
                     var xhr = new XMLHttpRequest();
                     xhr.open("POST", requestURL, false);
                     xhr.setRequestHeader("Content-Type", "application/json");
-                    xhr.setRequestHeader("Authorization", "Bearer " + jwtToken);
+                    xhr.setRequestHeader("X-JWT-Assertion", "" + jwtToken);
                     xhr.send();
 
                     if (xhr["status"] == 201 && xhr["responseText"]) {
@@ -124,6 +133,63 @@ var utils = function () {
                         log.error("{/app/modules/oauth/token-handler-utils.js} Error in retrieving tenant " +
                             "based client application credentials from API " +
                                 "Manager - getTenantBasedClientAppCredentials(x, y)");
+                        return null;
+                    }
+                }
+            }
+        }
+    };
+
+    publicMethods["getTenantBasedWebSocketClientAppCredentials"] = function (username) {
+        if (!username) {
+            log.error("{/app/modules/oauth/token-handler-utils.js} Error in retrieving tenant " +
+                "based client app credentials. No username " +
+                "as input - getTenantBasedWebSocketClientAppCredentials(x)");
+            return null;
+        } else {
+            //noinspection JSUnresolvedFunction, JSUnresolvedVariable
+            var tenantDomain = carbon.server.tenantDomain({username: username});
+            if (!tenantDomain) {
+                log.error("{/app/modules/oauth/token-handler-utils.js} Error in retrieving tenant " +
+                    "based client application credentials. Unable to obtain a valid tenant domain for provided " +
+                    "username - getTenantBasedWebSocketClientAppCredentials(x, y)");
+                return null;
+            } else {
+                var cachedBasedWebsocketClientAppCredentials = privateMethods.
+                getCachedBasedWebSocketClientAppCredentials(tenantDomain);
+                if (cachedBasedWebsocketClientAppCredentials) {
+                    return cachedBasedWebsocketClientAppCredentials;
+                } else {
+                    var adminUsername = deviceMgtProps["adminUser"];
+                    var adminUserTenantId = deviceMgtProps["adminUserTenantId"];
+                    //claims required for jwtAuthenticator.
+                    var claims = {"http://wso2.org/claims/enduserTenantId": adminUserTenantId,
+                        "http://wso2.org/claims/enduser": adminUsername};
+                    var jwtToken = publicMethods.getJwtToken(adminUsername, claims);
+
+                    // register a tenant based  app at API Manager
+                    var applicationName = "websocket_webapp_" + tenantDomain;
+                    var requestURL = (deviceMgtProps["oauthProvider"]["appRegistration"]
+                        ["apiManagerClientAppRegistrationServiceURL"]).replace("/tenants","");
+                    var xhr = new XMLHttpRequest();
+                    xhr.open("POST", requestURL, false);
+                    xhr.setRequestHeader("Content-Type", "application/json");
+                    xhr.setRequestHeader("X-JWT-Assertion", "" + jwtToken);
+                    xhr.send(stringify({applicationName:applicationName, tags:["device_management"],
+                        isAllowedToAllDomains:false, isMappingAnExistingOAuthApp:false, validityPeriod: 3600}));
+                    if (xhr["status"] == 201 && xhr["responseText"]) {
+                        var responsePayload = parse(xhr["responseText"]);
+                        var tenantTenantBasedWebsocketClientAppCredentials = {};
+                        tenantTenantBasedWebsocketClientAppCredentials["clientId"] = responsePayload["client_id"];
+                        tenantTenantBasedWebsocketClientAppCredentials["clientSecret"] =
+                            responsePayload["client_secret"];
+                        privateMethods.setCachedBasedWebSocketClientAppCredentials(tenantDomain,
+                            tenantTenantBasedWebsocketClientAppCredentials);
+                        return tenantTenantBasedWebsocketClientAppCredentials;
+                    } else {
+                        log.error("{/app/modules/oauth/token-handler-utils.js} Error in retrieving tenant " +
+                            "based client application credentials from API " +
+                            "Manager - getTenantBasedWebSocketClientAppCredentials(x, y)");
                         return null;
                     }
                 }
@@ -152,7 +218,32 @@ var utils = function () {
         }
     };
 
-    publicMethods["getTokenPairAndScopesByPasswordGrantType"] = function (username, password, encodedClientAppCredentials, scopes) {
+    privateMethods["getCachedBasedWebSocketClientAppCredentials"] = function (tenantDomain) {
+        var cachedBasedWebSocketClientAppCredentialsMap
+            = application.get(constants["CACHED_CREDENTIALS_FOR_WEBSOCKET_APP"]);
+        if (!cachedBasedWebSocketClientAppCredentialsMap ||
+            !cachedBasedWebSocketClientAppCredentialsMap[tenantDomain]) {
+            return null;
+        } else {
+            return cachedBasedWebSocketClientAppCredentialsMap[tenantDomain];
+        }
+    };
+
+    privateMethods["setCachedBasedWebSocketClientAppCredentials"] = function (tenantDomain, clientAppCredentials) {
+        var cachedBasedWebSocketClientAppCredentialsMap
+            = application.get(constants["CACHED_CREDENTIALS_FOR_WEBSOCKET_APP"]);
+        if (!cachedBasedWebSocketClientAppCredentialsMap) {
+            cachedBasedWebSocketClientAppCredentialsMap = {};
+            cachedBasedWebSocketClientAppCredentialsMap[tenantDomain] = clientAppCredentials;
+            application.put(constants["CACHED_CREDENTIALS_FOR_WEBSOCKET_APP"]
+                , cachedBasedWebSocketClientAppCredentialsMap);
+        } else if (!cachedBasedWebSocketClientAppCredentialsMap[tenantDomain]) {
+            cachedBasedWebSocketClientAppCredentialsMap[tenantDomain] = clientAppCredentials;
+        }
+    };
+
+    publicMethods["getTokenPairAndScopesByPasswordGrantType"] = function (username, password
+        , encodedClientAppCredentials, scopes) {
         if (!username || !password || !encodedClientAppCredentials || !scopes) {
             log.error("{/app/modules/oauth/token-handler-utils.js} Error in retrieving access token by password " +
                 "grant type. No username, password, encoded client app credentials or scopes are " +
@@ -185,59 +276,34 @@ var utils = function () {
         }
     };
 
-    publicMethods["getTokenPairAndScopesBySAMLGrantType"] = function (assertion, encodedClientAppCredentials, scopes) {
-        if (!assertion || !encodedClientAppCredentials || !scopes) {
-            log.error("{/app/modules/oauth/token-handler-utils.js} Error in retrieving access token by saml " +
-                "grant type. No assertion, encoded client app credentials or scopes are " +
-                    "found - getTokenPairAndScopesBySAMLGrantType(x, y, z)");
-            return null;
-        } else {
-            var assertionXML = publicMethods.decode(assertion);
-            /*
-             TODO: make assertion extraction with proper parsing.
-             Since Jaggery XML parser seem to add formatting which causes signature verification to fail.
-             */
-            var assertionStartMarker = "<saml2:Assertion";
-            var assertionEndMarker = "<\/saml2:Assertion>";
-            var assertionStartIndex = assertionXML.indexOf(assertionStartMarker);
-            var assertionEndIndex = assertionXML.indexOf(assertionEndMarker);
-
-            var extractedAssertion;
-            if (assertionStartIndex == -1 || assertionEndIndex == -1) {
-                log.error("{/app/modules/oauth/token-handler-utils.js} Error in retrieving access " +
-                    "token by saml grant type. Issue in assertion format - getTokenPairAndScopesBySAMLGrantType(x, y, z)");
-                return null;
-            } else {
-                extractedAssertion = assertionXML.
-                    substring(assertionStartIndex, assertionEndIndex) + assertionEndMarker;
-                var encodedAssertion = publicMethods.encode(extractedAssertion);
-
-                // calling oauth provider token service endpoint
-                var requestURL = deviceMgtProps["oauthProvider"]["tokenServiceURL"];
-                var requestPayload = "grant_type=urn:ietf:params:oauth:grant-type:saml2-bearer&" +
-                    "assertion=" + encodeURIComponent(encodedAssertion) + "&scope=" + scopes;
-
-                var xhr = new XMLHttpRequest();
-                xhr.open("POST", requestURL, false);
-                xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-                xhr.setRequestHeader("Authorization", "Basic " + encodedClientAppCredentials);
-                xhr.send(requestPayload);
-
-                if (xhr["status"] == 200 && xhr["responseText"]) {
-                    var responsePayload = parse(xhr["responseText"]);
-                    var tokenData = {};
-                    tokenData["accessToken"] = responsePayload["access_token"];
-                    tokenData["refreshToken"] = responsePayload["refresh_token"];
-                    tokenData["scopes"] = responsePayload["scope"];
-                    return tokenData;
-                } else {
-                    log.error("{/app/modules/oauth/token-handler-utils.js} Error in retrieving access token " +
-                        "by password grant type - getTokenPairAndScopesBySAMLGrantType(x, y, z)");
-                    return null;
-                }
-            }
-        }
-    };
+	publicMethods["getTokenPairAndScopesByJWTGrantType"] = function (assertion, encodedClientAppCredentials, scopes) {
+		if (!assertion || !encodedClientAppCredentials || !scopes) {
+			log.error("{/app/modules/oauth/token-handler-utils.js} Error in retrieving access token by jwt " +
+			"grant type. No assertion, encoded client app credentials or scopes are " +
+			"found - getTokenPairAndScopesByJWTGrantType(x, y, z)");
+			return null;
+		} else {
+			var ssoLoginUser = authModule.ssoLogin(assertion);
+			if (!ssoLoginUser.user.username) {
+				return null;
+			}
+			var endUsername = ssoLoginUser.user.username + "@" + ssoLoginUser.user.domain;
+			var JWTClientManagerServicePackagePath =
+				"org.wso2.carbon.identity.jwt.client.extension.service.JWTClientManagerService";
+			//noinspection JSUnresolvedFunction, JSUnresolvedVariable
+			var JWTClientManagerService = carbon.server.osgiService(JWTClientManagerServicePackagePath);
+			//noinspection JSUnresolvedFunction
+			var jwtClient = JWTClientManagerService.getJWTClient();
+			// returning access token by JWT grant type
+			var tokenInfo = jwtClient.getAccessToken(encodedClientAppCredentials,
+				endUsername, scopes);
+			var tokenData = {};
+			tokenData["accessToken"] = tokenInfo.getAccessToken();
+			tokenData["refreshToken"] = tokenInfo.getRefreshToken();
+			tokenData["scopes"] = tokenInfo.getScopes();
+			return tokenData;
+		}
+	};
 
     publicMethods["getNewTokenPairByRefreshToken"] = function (refreshToken, encodedClientAppCredentials, scopes) {
         if (!refreshToken || !encodedClientAppCredentials) {
@@ -288,6 +354,27 @@ var utils = function () {
             // returning access token by JWT grant type
             return jwtClient.getAccessToken(clientAppCredentials["clientId"], clientAppCredentials["clientSecret"],
                 deviceMgtProps["oauthProvider"]["appRegistration"]["owner"], null)["accessToken"];
+        }
+    };
+
+    publicMethods["getJwtToken"] =  function (username, claims) {
+        if (!username) {
+            log.error("{/app/modules/oauth/token-handler-utils.js} Error in retrieving new jwt token");
+            return null;
+        } else {
+            var JWTClientManagerServicePackagePath =
+                "org.wso2.carbon.identity.jwt.client.extension.service.JWTClientManagerService";
+            //noinspection JSUnresolvedFunction, JSUnresolvedVariable
+            var JWTClientManagerService = carbon.server.osgiService(JWTClientManagerServicePackagePath);
+            //noinspection JSUnresolvedFunction
+            var jwtClient = JWTClientManagerService.getJWTClient();
+            // returning access token by JWT grant type
+			if (claims) {
+				return jwtClient.getJwtToken(username, claims);
+			} else {
+				return jwtClient.getJwtToken(username);
+			}
+
         }
     };
 

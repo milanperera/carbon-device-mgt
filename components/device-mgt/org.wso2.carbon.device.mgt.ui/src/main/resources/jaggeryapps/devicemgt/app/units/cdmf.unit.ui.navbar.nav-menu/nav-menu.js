@@ -32,6 +32,7 @@ function onRequest(context) {
     var constants = require("/app/modules/constants.js");
     var uiPermissions = userModule.getUIPermissions();
     context["permissions"] = uiPermissions;
+    context["userMgtEnabled"] = (uiPermissions["LIST_USERS"] || uiPermissions["LIST_ROLES"]);
 
     var links = {
         "user-mgt": [],
@@ -51,6 +52,7 @@ function onRequest(context) {
     context["isAuthorizedForNotifications"] = isAuthorizedForNotifications;
     context["currentUser"] = currentUser;
     context["appContext"] = mdmProps["appContext"];
+    context["isCloud"] = mdmProps["isCloud"];
 
     return context;
 }

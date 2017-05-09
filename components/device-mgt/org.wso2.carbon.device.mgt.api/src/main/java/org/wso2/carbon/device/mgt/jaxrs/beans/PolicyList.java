@@ -21,7 +21,7 @@ package org.wso2.carbon.device.mgt.jaxrs.beans;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
-import org.wso2.carbon.policy.mgt.common.Policy;
+import org.wso2.carbon.device.mgt.common.policy.mgt.Policy;
 
 import java.util.List;
 
@@ -30,7 +30,8 @@ public class PolicyList extends BasePaginatedResult {
 
     private List<Policy> policies;
 
-    @ApiModelProperty(value = "List of policies returned")
+    @ApiModelProperty(value = "Returns the list of policies that match the offset and limit parameter values" +
+            " that were specified.")
     @JsonProperty("policies")
     public List<Policy> getList() {
         return policies;

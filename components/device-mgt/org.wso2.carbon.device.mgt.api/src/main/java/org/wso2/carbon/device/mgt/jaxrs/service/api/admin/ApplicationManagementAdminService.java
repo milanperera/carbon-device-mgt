@@ -18,13 +18,22 @@
  */
 package org.wso2.carbon.device.mgt.jaxrs.service.api.admin;
 
-import io.swagger.annotations.*;
-import org.wso2.carbon.apimgt.annotations.api.API;
-import org.wso2.carbon.apimgt.annotations.api.Permission;
+import io.swagger.annotations.SwaggerDefinition;
+import io.swagger.annotations.Info;
+import io.swagger.annotations.ExtensionProperty;
+import io.swagger.annotations.Extension;
+import io.swagger.annotations.Tag;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
 import org.wso2.carbon.apimgt.annotations.api.Scope;
+import org.wso2.carbon.apimgt.annotations.api.Scopes;
 import org.wso2.carbon.device.mgt.common.operation.mgt.Activity;
 import org.wso2.carbon.device.mgt.jaxrs.beans.ApplicationWrapper;
 import org.wso2.carbon.device.mgt.jaxrs.beans.ErrorResponse;
+import org.wso2.carbon.device.mgt.jaxrs.util.Constants;
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.POST;
@@ -33,12 +42,41 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-@API(name = "ApplicationManagementAdmin", version = "1.0.0", context = "/api/device-mgt/v1.0/admin/applications", tags = {"device_management"})
-
+@SwaggerDefinition(
+        info = @Info(
+                version = "1.0.0",
+                title = "",
+                extensions = {
+                        @Extension(properties = {
+                                @ExtensionProperty(name = "name", value = "ApplicationManagementAdmin"),
+                                @ExtensionProperty(name = "context", value = "/api/device-mgt/v1.0/admin/applications"),
+                        })
+                }
+        ),
+        tags = {
+                @Tag(name = "device_management", description = "")
+        }
+)
 @Path("/admin/applications")
 @Api(value = "Application Management Administrative Service", description = "This an  API intended to be used by " +
         "'internal' components to log in as an admin user and do a selected number of operations. " +
         "Further, this is strictly restricted to admin users only ")
+@Scopes(
+        scopes = {
+                @Scope(
+                        name = "Installing an Application (Internal API)",
+                        description = "Installing an Application (Internal API)",
+                        key = "perm:applications:install",
+                        permissions = {"/device-mgt/applications/manage"}
+                ),
+                @Scope(
+                        name = "Uninstalling an Application (Internal API)",
+                        description = "Uninstalling an Application (Internal API)",
+                        key = "perm:applications:uninstall",
+                        permissions = {"/device-mgt/applications/manage"}
+                )
+        }
+)
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public interface ApplicationManagementAdminService {
@@ -52,7 +90,13 @@ public interface ApplicationManagementAdminService {
             value = "Installing an Application (Internal API)",
             notes = "This is an internal API that can be used to install an application on a device.",
             response = Activity.class,
-            tags = "Application Management Administrative Service")
+            tags = "Application Management Administrative Service",
+            extensions = {
+                    @Extension(properties = {
+                            @ExtensionProperty(name = Constants.SCOPE, value = "perm:applications:install")
+                    })
+            }
+    )
     @ApiResponses(value = {
             @ApiResponse(
                     code = 202,
@@ -75,7 +119,6 @@ public interface ApplicationManagementAdminService {
                             " for a specified set of devices.",
                     response = ErrorResponse.class)
     })
-    @Permission(name = "Install/Uninstall applications", permission = "/device-mgt/applications/manage")
     Response installApplication(
             @ApiParam(
                     name = "applicationWrapper",
@@ -91,7 +134,13 @@ public interface ApplicationManagementAdminService {
             value = "Uninstalling an Application (Internal API)\n",
             notes = "This is an internal API that can be used to uninstall an application.",
             response = Activity.class,
-            tags = "Application Management Administrative Service")
+            tags = "Application Management Administrative Service",
+            extensions = {
+                    @Extension(properties = {
+                            @ExtensionProperty(name = Constants.SCOPE, value = "perm:applications:uninstall")
+                    })
+            }
+    )
     @ApiResponses(value = {
             @ApiResponse(
                     code = 202,
@@ -109,11 +158,10 @@ public interface ApplicationManagementAdminService {
                     message = "Unsupported media type. \n The entity of the request was in a not supported format."),
             @ApiResponse(
                     code = 500,
-                    message = "Internal Server Error. \n Server error occurred while executing the application install operation in bulk" +
-                    " for a specified set of devices.",
+                    message = "Internal Server Error. \n Server error occurred while executing the application install" +
+                            " operation in bulk for a specified set of devices.",
                     response = ErrorResponse.class)
     })
-    @Permission(name = "Install/Uninstall applications", permission = "/device-mgt/applications/manage")
     Response uninstallApplication(
             @ApiParam(
                     name = "applicationWrapper",

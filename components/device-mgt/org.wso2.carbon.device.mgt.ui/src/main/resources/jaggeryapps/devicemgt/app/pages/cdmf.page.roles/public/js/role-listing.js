@@ -37,6 +37,7 @@ var modalPopupContainer = modalPopup + " .modal-content";
 var modalPopupContent = modalPopup + " .modal-content";
 var body = "body";
 var isInit = true;
+var isCloud = false;
 
 
 /**
@@ -72,7 +73,7 @@ function showPopup() {
 function hidePopup() {
     $(modalPopupContent).html('');
     $(modalPopup).modal('hide');
-    $('body').removeClass('modal-open').css('padding-right','0px');
+    $('body').removeClass('modal-open').css('padding-right', '0px');
     $('.modal-backdrop').remove();
 }
 
@@ -86,20 +87,24 @@ function InitiateViewOption() {
     // $(location).attr('href', $(this).data("url"));
 }
 
+function htmlspecialchars(text) {
+    return jQuery('<div/>').text(text).html();
+}
+
 function loadRoles() {
+    isCloud = $("#role-table").data("cloud");
     var loadingContent = $("#loading-content");
     loadingContent.show();
 
     var dataFilter = function (data) {
         data = JSON.parse(data);
-
         var objects = [];
-
+        var count = 0;
         $(data.roles).each(function (index) {
             objects.push(
                 {
-                    name: data.roles[index],
-                    DT_RowId: "role-" + data.roles[index]
+                    name: htmlspecialchars(data.roles[index]),
+                    DT_RowId: "role-" + htmlspecialchars(data.roles[index])
                 }
             )
         });
@@ -128,23 +133,29 @@ function loadRoles() {
             "</div>"
         },
         {
-            class: "fade-edge",
+            class: "",
             data: "name",
             render: function (name, type, row, meta) {
-                return '<h4>' + name + 'role</h4>';
+                return '<h4>' + name.replace("devicemgt", ""); + '</h4>';
             }
         },
         {
             class: "text-right content-fill text-left-on-grid-view no-wrap",
             data: null,
             render: function (data, type, row, meta) {
-                return '' +
-                    '<a onclick="javascript:loadRoleBasedActionURL(\'edit\', \'' + data.name + '\')" ' +
+                var isCloud = false;
+                if ($('#is-cloud').length > 0) {
+                    isCloud = true;
+                }
+
+                var innerhtml = '';
+
+                var editLink = '<a onclick="javascript:loadRoleBasedActionURL(\'edit\', \'' + data.name + '\')" ' +
                     'data-role="' + data.name + '" ' +
                     'data-click-event="edit-form" ' +
                     'class="btn padding-reduce-on-grid-view edit-role-link">' +
                     '<span class="fw-stack">' +
-                    '<i class="fw fw-ring fw-stack-2x"></i>' +
+                    '<i class="fw fw-circle-outline fw-stack-2x"></i>' +
                     '<i class="fw fw-bookmark fw-stack-1x"></i>' +
                     '<span class="fw-stack fw-move-right fw-move-bottom">' +
                     '<i class="fw fw-circle fw-stack-2x fw-stroke fw-inverse"></i>' +
@@ -152,13 +163,14 @@ function loadRoles() {
                     '</span>' +
                     '</span>' +
                     '<span class="hidden-xs hidden-on-grid-view">Edit</span>' +
-                    '</a>' +
-                    '<a onclick="javascript:loadRoleBasedActionURL(\'edit-permission\', \'' + data.name + '\')" ' +
+                    '</a>';
+
+                var editPermissionLink = '<a onclick="javascript:loadRoleBasedActionURL(\'edit-permission\', \'' + data.name + '\')" ' +
                     'data-role="' + data.name + '" ' +
                     'data-click-event="edit-form" ' +
                     'class="btn padding-reduce-on-grid-view edit-permission-link">' +
                     '<span class="fw-stack">' +
-                    '<i class="fw fw-ring fw-stack-2x"></i>' +
+                    '<i class="fw fw-circle-outline fw-stack-2x"></i>' +
                     '<i class="fw fw-security-policy fw-stack-1x"></i>' +
                     '<span class="fw-stack fw-move-right fw-move-bottom">' +
                     '<i class="fw fw-circle fw-stack-2x fw-stroke fw-inverse"></i>' +
@@ -166,16 +178,22 @@ function loadRoles() {
                     '</span>' +
                     '</span>' +
                     '<span class="hidden-xs hidden-on-grid-view">Edit Permission</span>' +
-                    '</a>' +
-                    '<a data-role="' + data.name + '" ' +
+                    '</a>';
+
+                var removeLink = '<a data-role="' + data.name + '" ' +
                     'data-click-event="remove-form" ' +
                     'class="btn padding-reduce-on-grid-view remove-role-link">' +
                     '<span class="fw-stack">' +
-                    '<i class="fw fw-ring fw-stack-2x"></i>' +
+                    '<i class="fw fw-circle-outline fw-stack-2x"></i>' +
                     '<i class="fw fw-delete fw-stack-1x"></i>' +
                     '</span>' +
                     '<span class="hidden-xs hidden-on-grid-view">Remove</span>' +
                     '</a>';
+
+                if (!isCloud) {
+                    innerhtml = editLink + editPermissionLink + removeLink;
+                }
+                return innerhtml;
             }
         }
     ];
@@ -187,8 +205,12 @@ function loadRoles() {
     var settings = {
         "sorting": false
     };
+    var roleApiUrl = '/api/device-mgt/v1.0/roles?user-store=all';
+    if (isCloud) {
+        roleApiUrl = '/api/device-mgt/v1.0/roles/filter/devicemgt?user-store=all';
+    }
 
-    $('#role-grid').datatables_extended_serverside_paging(settings, '/api/device-mgt/v1.0/roles?user-store=all', dataFilter, columns, fnCreatedRow, null, options);
+    $('#role-grid').datatables_extended_serverside_paging(settings, roleApiUrl, dataFilter, columns, fnCreatedRow, null, options);
     loadingContent.hide();
 
 }

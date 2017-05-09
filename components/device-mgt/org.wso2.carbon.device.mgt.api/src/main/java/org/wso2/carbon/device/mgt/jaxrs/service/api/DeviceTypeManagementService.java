@@ -18,30 +18,59 @@
  */
 package org.wso2.carbon.device.mgt.jaxrs.service.api;
 
+import io.swagger.annotations.SwaggerDefinition;
+import io.swagger.annotations.Info;
+import io.swagger.annotations.ExtensionProperty;
+import io.swagger.annotations.Extension;
+import io.swagger.annotations.Tag;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.ResponseHeader;
-import org.wso2.carbon.apimgt.annotations.api.API;
-import org.wso2.carbon.apimgt.annotations.api.Permission;
+import org.wso2.carbon.apimgt.annotations.api.Scope;
+import org.wso2.carbon.apimgt.annotations.api.Scopes;
 import org.wso2.carbon.device.mgt.jaxrs.beans.DeviceTypeList;
 import org.wso2.carbon.device.mgt.jaxrs.beans.ErrorResponse;
+import org.wso2.carbon.device.mgt.jaxrs.util.Constants;
 
 import javax.validation.constraints.Size;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.GET;
-import javax.ws.rs.HeaderParam;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
+import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-@API(name = "DeviceTypeManagement", version = "1.0.0", context = "/api/device-mgt/v1.0/device-types",
-     tags = {"device_management"})
-
+@SwaggerDefinition(
+        info = @Info(
+                version = "1.0.0",
+                title = "",
+                extensions = {
+                        @Extension(properties = {
+                                @ExtensionProperty(name = "name", value = "DeviceTypeManagement"),
+                                @ExtensionProperty(name = "context", value = "/api/device-mgt/v1.0/device-types"),
+                        })
+                }
+        ),
+        tags = {
+                @Tag(name = "device_management", description = "")
+        }
+)
+@Scopes(
+        scopes = {
+                @Scope(
+                        name = "Getting the Supported Device Platforms",
+                        description = "Getting the Supported Device Platforms",
+                        key = "perm:device-types:types",
+                        permissions = {"/device-mgt/devices/owning-device/view"}
+                ),
+                @Scope(
+                        name = "Get Feature Details of a Device Type",
+                        description = "Get Feature Details of a Device Type",
+                        key = "perm:device-types:features",
+                        permissions = {"/device-mgt/devices/owning-device/view"}
+                )
+        }
+)
 @Path("/device-types")
 @Api(value = "Device Type Management", description = "This API corresponds to all tasks related to device " +
         "type management")
@@ -55,7 +84,13 @@ public interface DeviceTypeManagementService {
             httpMethod = "GET",
             value = "Getting the Supported Device Platforms",
             notes = "Get the list of device platforms supported by WSO2 EMM.",
-            tags = "Device Type Management")
+            tags = "Device Type Management",
+            extensions = {
+                    @Extension(properties = {
+                            @ExtensionProperty(name = Constants.SCOPE, value = "perm:device-types:types")
+                    })
+            }
+    )
     @ApiResponses(
             value = {
                     @ApiResponse(
@@ -80,7 +115,8 @@ public interface DeviceTypeManagementService {
                     @ApiResponse(
                             code = 304,
                             message =
-                                    "Not Modified. \n Empty body because the client already has the latest version of the requested resource.\n"),
+                                    "Not Modified. \n Empty body because the client already has the latest version " +
+                                            "of the requested resource.\n"),
                     @ApiResponse(
                             code = 406,
                             message = "Not Acceptable.\n The requested media type is not supported"),
@@ -91,7 +127,6 @@ public interface DeviceTypeManagementService {
                             response = ErrorResponse.class)
             }
     )
-    @Permission(name = "View Device Types", permission = "/device-mgt/devices/owning-device/view")
     Response getDeviceTypes(
             @ApiParam(
                     name = "If-Modified-Since",
@@ -103,13 +138,21 @@ public interface DeviceTypeManagementService {
                     String ifModifiedSince);
 
     @GET
+    @Path("/{type}/features")
     @ApiOperation(
             produces = MediaType.APPLICATION_JSON,
             httpMethod = "GET",
             value = "Get Feature Details of a Device Type",
             notes = "The features in WSO2 EMM enables you to carry out many operations on a given device platform. " +
-                    "Using this REST API you can get the features that can be carried out on a preferred device type, such as iOS, Android or Windows.",
-            tags = "Device Type Management")
+                    "Using this REST API you can get the features that can be carried out on a preferred device type," +
+                    " such as iOS, Android or Windows.",
+            tags = "Device Type Management",
+            extensions = {
+                @Extension(properties = {
+                        @ExtensionProperty(name = Constants.SCOPE, value = "perm:device-types:features")
+                })
+            }
+    )
     @ApiResponses(
             value = {
                     @ApiResponse(
@@ -134,7 +177,8 @@ public interface DeviceTypeManagementService {
                     @ApiResponse(
                             code = 304,
                             message =
-                                    "Not Modified. \n Empty body because the client already has the latest version of the requested resource.\n"),
+                                    "Not Modified. \n Empty body because the client already has the latest version " +
+                                            "of the requested resource.\n"),
                     @ApiResponse(
                             code = 406,
                             message = "Not Acceptable.\n The requested media type is not supported"),
@@ -145,13 +189,11 @@ public interface DeviceTypeManagementService {
                             response = ErrorResponse.class)
             }
     )
-    @Permission(name = "View Device Types", permission = "/device-mgt/devices/owning-device/view")
     Response getFeatures(
             @ApiParam(
                     name = "type",
-                    value = "The device type, such as ios, android or windows.",
-                    required = true,
-                    allowableValues = "android, ios, windows")
+                    value = "The device type name, such as ios, android, windows or fire-alarm.",
+                    required = true)
             @PathParam("type")
             @Size(max = 45)
                     String type,

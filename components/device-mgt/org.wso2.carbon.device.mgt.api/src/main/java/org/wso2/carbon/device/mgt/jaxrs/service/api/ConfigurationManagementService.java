@@ -18,11 +18,24 @@
  */
 package org.wso2.carbon.device.mgt.jaxrs.service.api;
 
-import io.swagger.annotations.*;
-import org.wso2.carbon.apimgt.annotations.api.API;
-import org.wso2.carbon.apimgt.annotations.api.Permission;
+import io.swagger.annotations.SwaggerDefinition;
+import io.swagger.annotations.Info;
+import io.swagger.annotations.ExtensionProperty;
+import io.swagger.annotations.Extension;
+import io.swagger.annotations.Tag;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.AuthorizationScope;
+import io.swagger.annotations.Authorization;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
+import io.swagger.annotations.ResponseHeader;
+import org.wso2.carbon.apimgt.annotations.api.Scope;
+import org.wso2.carbon.apimgt.annotations.api.Scopes;
 import org.wso2.carbon.device.mgt.common.configuration.mgt.PlatformConfiguration;
 import org.wso2.carbon.device.mgt.jaxrs.beans.ErrorResponse;
+import org.wso2.carbon.device.mgt.jaxrs.util.Constants;
 
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
@@ -31,13 +44,41 @@ import javax.ws.rs.core.Response;
 /**
  * General Tenant Configuration REST-API.
  */
-@API(name = "ConfigurationManagement", version = "1.0.0", context = "/api/device-mgt/v1.0/configuration", tags = {"device_management"})
-
+@SwaggerDefinition(
+        info = @Info(
+                version = "1.0.0",
+                title = "",
+                extensions = {
+                        @Extension(properties = {
+                                @ExtensionProperty(name = "name", value = "ConfigurationManagement"),
+                                @ExtensionProperty(name = "context", value = "/api/device-mgt/v1.0/configuration"),
+                        })
+                }
+        ),
+        tags = {
+                @Tag(name = "device_management", description = "")
+        }
+)
 @Path("/configuration")
 @Api(value = "Configuration Management", description = "The general platform configuration management capabilities are exposed " +
         "through this API.")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
+@Scopes(scopes = {
+        @Scope(
+                name = "View configurations",
+                description = "",
+                key = "perm:view-configuration",
+                permissions = {"/device-mgt/platform-configurations/view"}
+        ),
+        @Scope(
+                name = "Manage configurations",
+                description = "",
+                key = "perm:manage-configuration",
+                permissions = {"/device-mgt/platform-configurations/manage"}
+        )
+}
+)
 public interface ConfigurationManagementService {
 
     @GET
@@ -48,7 +89,13 @@ public interface ConfigurationManagementService {
             notes = "WSO2 EMM monitors policies to verify that the devices comply with the policies enforced on them. " +
                     "General platform configurations include the settings on how often the device need to be monitored. " +
                     "Using this REST API you can get the general platform level configurations.",
-            tags = "Configuration Management")
+            tags = "Configuration Management",
+            extensions = {
+                    @Extension(properties = {
+                            @ExtensionProperty(name = Constants.SCOPE, value = "perm:view-configuration")
+                    })
+            }
+    )
     @ApiResponses(
             value = {
             @ApiResponse(
@@ -82,7 +129,6 @@ public interface ConfigurationManagementService {
                             "platform configurations.",
                     response = ErrorResponse.class)
     })
-    @Permission(name = "View Configurations", permission = "/device-mgt/platform-configurations/view")
     Response getConfiguration(
             @ApiParam(
                     name = "If-Modified-Since",
@@ -102,7 +148,13 @@ public interface ConfigurationManagementService {
             notes = "WSO2 EMM monitors policies to verify that the devices comply with the policies enforced on them." +
                     "General platform configurations include the settings on how often the the device need to be monitored." +
                     "Using this REST API you can update the general platform level configurations.",
-            tags = "Configuration Management")
+            tags = "Configuration Management",
+            extensions = {
+                    @Extension(properties = {
+                            @ExtensionProperty(name = Constants.SCOPE, value = "perm:manage-configuration")
+                    })
+            }
+    )
     @ApiResponses(
             value = {
             @ApiResponse(
@@ -132,7 +184,6 @@ public interface ConfigurationManagementService {
                             "Server error occurred while modifying the general platform configurations.",
                     response = ErrorResponse.class)
     })
-    @Permission(name = "Manage configurations", permission = "/device-mgt/platform-configurations/manage")
     Response updateConfiguration(
             @ApiParam(
                     name = "configuration",

@@ -18,23 +18,23 @@
 
 package org.wso2.carbon.apimgt.application.extension;
 
+import feign.FeignException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.json.simple.JSONObject;
-import org.wso2.carbon.apimgt.api.APIConsumer;
-import org.wso2.carbon.apimgt.api.APIManagementException;
-import org.wso2.carbon.apimgt.api.model.*;
 import org.wso2.carbon.apimgt.application.extension.constants.ApiApplicationConstants;
 import org.wso2.carbon.apimgt.application.extension.dto.ApiApplicationKey;
 import org.wso2.carbon.apimgt.application.extension.exception.APIManagerException;
+import org.wso2.carbon.apimgt.application.extension.internal.APIApplicationManagerExtensionDataHolder;
 import org.wso2.carbon.apimgt.application.extension.util.APIManagerUtil;
-import org.wso2.carbon.apimgt.impl.APIConstants;
-import org.wso2.carbon.apimgt.impl.APIManagerFactory;
+import org.wso2.carbon.apimgt.integration.client.store.*;
+import org.wso2.carbon.apimgt.integration.generated.client.store.model.*;
+import org.wso2.carbon.context.PrivilegedCarbonContext;
 import org.wso2.carbon.utils.multitenancy.MultitenantConstants;
-import org.wso2.carbon.utils.multitenancy.MultitenantUtils;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * This class represents an implementation of APIManagementProviderService.
@@ -42,152 +42,37 @@ import java.util.Set;
 public class APIManagementProviderServiceImpl implements APIManagementProviderService {
 
     private static final Log log = LogFactory.getLog(APIManagementProviderServiceImpl.class);
+    private static final String CONTENT_TYPE = "application/json";
+    private static final int MAX_API_PER_TAG = 200;
+    private static final String APP_TIER_TYPE = "application";
 
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public ApiApplicationKey generateAndRetrieveApplicationKeys(String apiApplicationName, String keyType,
-                                                                String username, boolean isAllowedAllDomains)
-            throws APIManagerException {
+    public boolean isTierLoaded() {
+        StoreClient storeClient = APIApplicationManagerExtensionDataHolder.getInstance().getIntegrationClientService()
+                .getStoreClient();
+        String tenantDomain = PrivilegedCarbonContext.getThreadLocalCarbonContext()
+                .getTenantDomain();
         try {
-            APIManagerUtil.loadTenantRegistry();
-            APIConsumer apiConsumer = APIManagerFactory.getInstance().getAPIConsumer(username);
-            String groupId = getLoggedInUserGroupId(username, APIManagerUtil.getTenantDomain());
-            int applicationId = createApplicationAndSubscribeToAllAPIs(apiApplicationName, username);
-            Application[] applications = apiConsumer.getApplications(apiConsumer.getSubscriber(username), groupId);
-            Application application = null;
-            for (Application app : applications) {
-                if (app.getId() == applicationId) {
-                    application = app;
-                }
-            }
-            if (application == null) {
-                throw new APIManagerException("Api application creation failed for " + apiApplicationName +
-                                              " to the user " + username);
-            }
-            APIKey retrievedApiApplicationKey = null;
-            for (APIKey apiKey : application.getKeys()) {
-                String applicationKeyType = apiKey.getType();
-                if (applicationKeyType != null && applicationKeyType.equals(keyType)) {
-                    retrievedApiApplicationKey = apiKey;
-                    break;
-                }
-            }
-            if (retrievedApiApplicationKey != null) {
-                ApiApplicationKey apiApplicationKey = new ApiApplicationKey();
-                apiApplicationKey.setConsumerKey(retrievedApiApplicationKey.getConsumerKey());
-                apiApplicationKey.setConsumerSecret(retrievedApiApplicationKey.getConsumerSecret());
-                return apiApplicationKey;
-            }
-            String[] allowedDomains = new String[1];
-            if (isAllowedAllDomains) {
-                allowedDomains[0] = ApiApplicationConstants.ALLOWED_DOMAINS;
-            } else {
-                allowedDomains[0] = APIManagerUtil.getTenantDomain();
-            }
-            JSONObject jsonObject = new JSONObject();
-            jsonObject.put(ApiApplicationConstants.JSONSTRING_USERNAME_TAG, username);
-            String ownerJsonString = jsonObject.toJSONString();
-            Map<String, Object> keyDetails = apiConsumer.requestApprovalForApplicationRegistration(username,
-                                                                                                   apiApplicationName,
-                                                                                                   keyType, "",
-                                                                                                   allowedDomains,
-                                                                                                   ApiApplicationConstants.DEFAULT_VALIDITY_PERIOD,
-                                                                                                   "null", groupId,
-                                                                                                   ownerJsonString);
-            ApiApplicationKey apiApplicationKey = new ApiApplicationKey();
-            apiApplicationKey.setConsumerKey((String) keyDetails.get(APIConstants.FrontEndParameterNames
-                                                                             .CONSUMER_KEY));
-            apiApplicationKey.setConsumerSecret((String) keyDetails.get(
-                    APIConstants.FrontEndParameterNames.CONSUMER_SECRET));
-            return apiApplicationKey;
-        } catch (APIManagementException e) {
-            throw new APIManagerException("Failed to register a api application : " + apiApplicationName, e);
-        }
-    }
 
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void registerExistingOAuthApplicationToAPIApplication(String jsonString, String applicationName,
-                                                                 String clientId, String username,
-                                                                 boolean isAllowedAllDomains, String keyType,
-                                                                 String tags[]) throws APIManagerException {
-        try {
-            APIManagerUtil.loadTenantRegistry();
-            APIConsumer apiConsumer = APIManagerFactory.getInstance().getAPIConsumer(username);
-            if (apiConsumer != null) {
-                String groupId = getLoggedInUserGroupId(username, APIManagerUtil.getTenantDomain());
-                int applicationId = createApplication(apiConsumer, applicationName, username, groupId);
-                Subscriber subscriber = apiConsumer.getSubscriber(username);
-                if (subscriber == null) {
-                    String tenantDomain = MultitenantUtils.getTenantDomain(username);
-                    addSubscriber(username, "", groupId, APIManagerUtil.getTenantId(tenantDomain));
-                    subscriber = apiConsumer.getSubscriber(username);
-                }
-                Application[] applications = apiConsumer.getApplications(subscriber, groupId);
-                Application application = null;
-                for (Application app : applications) {
-                    if (app.getId() == applicationId) {
-                        application = app;
-                    }
-                }
-                if (application == null) {
-                    throw new APIManagerException(
-                            "Api application creation failed for " + applicationName + " to the user " + username);
-                }
-
-                APIKey retrievedApiApplicationKey = null;
-                for (APIKey apiKey : application.getKeys()) {
-                    String applicationKeyType = apiKey.getType();
-                    if (applicationKeyType != null && applicationKeyType.equals(keyType)) {
-                        retrievedApiApplicationKey = apiKey;
-                        break;
-                    }
-                }
-                if (retrievedApiApplicationKey != null) {
-                    if (retrievedApiApplicationKey.getConsumerKey().equals(clientId)) {
-                        if (tags != null && tags.length > 0) {
-                            createApplicationAndSubscribeToAPIs(applicationName, tags, username);
-                        }
-                        return;
-                    } else {
-                        throw new APIManagerException("Api application already mapped to another OAuth App");
-                    }
-                }
-
-                apiConsumer.mapExistingOAuthClient(jsonString, username, clientId, applicationName,
-                                                   ApiApplicationConstants.DEFAULT_TOKEN_TYPE);
-                if (tags != null && tags.length > 0) {
-                    createApplicationAndSubscribeToAPIs(applicationName, tags, username);
-                }
-            }
-        } catch (APIManagementException e) {
-            throw new APIManagerException(
-                    "Failed registering the OAuth app [ clientId " + clientId + " ] with api manager application", e);
+            storeClient.getIndividualTier().tiersTierLevelTierNameGet(ApiApplicationConstants.DEFAULT_TIER,
+                                                                      APP_TIER_TYPE,
+                                                                      tenantDomain, CONTENT_TYPE, null, null);
+            return true;
+        } catch (FeignException e) {
+            return false;
         }
     }
 
     @Override
     public void removeAPIApplication(String applicationName, String username) throws APIManagerException {
-        try {
-            APIManagerUtil.loadTenantRegistry();
-            APIConsumer apiConsumer = APIManagerFactory.getInstance().getAPIConsumer(username);
-            if (apiConsumer != null) {
-                String groupId = getLoggedInUserGroupId(username, APIManagerUtil.getTenantDomain());
-                Application[] applications = apiConsumer.getApplications(new Subscriber(username), groupId);
-                for (Application application : applications) {
-                    if (application.getName().equals(applicationName)) {
-                        apiConsumer.removeApplication(application);
-                        break;
-                    }
-                }
-            }
-        } catch (APIManagementException e) {
-            throw new APIManagerException(
-                    "Failed to remove the application [ application name " + applicationName + " ]", e);
+
+        StoreClient storeClient = APIApplicationManagerExtensionDataHolder.getInstance().getIntegrationClientService()
+                .getStoreClient();
+        ApplicationList applicationList = storeClient.getApplications()
+                .applicationsGet("", applicationName, 1, 0, CONTENT_TYPE, null);
+        if (applicationList.getList() != null && applicationList.getList().size() > 0) {
+            ApplicationInfo applicationInfo = applicationList.getList().get(0);
+            storeClient.getIndividualApplication().applicationsApplicationIdDelete(applicationInfo.getApplicationId(),
+                                                                                   null, null);
         }
     }
 
@@ -195,248 +80,113 @@ public class APIManagementProviderServiceImpl implements APIManagementProviderSe
      * {@inheritDoc}
      */
     @Override
-    public ApiApplicationKey generateAndRetrieveApplicationKeys(String apiApplicationName, String tags[],
+    public synchronized ApiApplicationKey generateAndRetrieveApplicationKeys(String applicationName, String tags[],
                                                                 String keyType, String username,
-                                                                boolean isAllowedAllDomains)
+                                                                boolean isAllowedAllDomains, String validityTime)
             throws APIManagerException {
-        try {
-            APIManagerUtil.loadTenantRegistry();
-            APIConsumer apiConsumer = APIManagerFactory.getInstance().getAPIConsumer(username);
-            String groupId = getLoggedInUserGroupId(username, APIManagerUtil.getTenantDomain());
-            int applicationId = createApplicationAndSubscribeToAPIs(apiApplicationName, tags, username);
-            Application[] applications = apiConsumer.getApplications(apiConsumer.getSubscriber(username), groupId);
-            Application application = null;
-            for (Application app : applications) {
-                if (app.getId() == applicationId) {
-                    application = app;
-                }
-            }
-            if (application == null) {
-                throw new APIManagerException(
-                        "Api application creation failed for " + apiApplicationName + " to the user " + username);
-            }
+        StoreClient storeClient = APIApplicationManagerExtensionDataHolder.getInstance().getIntegrationClientService()
+                .getStoreClient();
+        String tenantDomain = PrivilegedCarbonContext.getThreadLocalCarbonContext()
+                .getTenantDomain();
 
-            APIKey retrievedApiApplicationKey = null;
-            for (APIKey apiKey : application.getKeys()) {
-                String applicationKeyType = apiKey.getType();
-                if (applicationKeyType != null && applicationKeyType.equals(keyType)) {
-                    retrievedApiApplicationKey = apiKey;
-                    break;
-                }
-            }
-            if (retrievedApiApplicationKey != null) {
-                ApiApplicationKey apiApplicationKey = new ApiApplicationKey();
-                apiApplicationKey.setConsumerKey(retrievedApiApplicationKey.getConsumerKey());
-                apiApplicationKey.setConsumerSecret(retrievedApiApplicationKey.getConsumerSecret());
-                return apiApplicationKey;
-            }
-            String[] allowedDomains = new String[1];
-            if (isAllowedAllDomains) {
-                allowedDomains[0] = ApiApplicationConstants.ALLOWED_DOMAINS;
-            } else {
-                allowedDomains[0] = APIManagerUtil.getTenantDomain();
-            }
-            String validityTime = "3600";
-            String ownerJsonString = "{\"username\":\"" + username + "\"}";
-            Map<String, Object> keyDetails = apiConsumer.requestApprovalForApplicationRegistration(username,
-                                                                                                   apiApplicationName,
-                                                                                                   keyType, "",
-                                                                                                   allowedDomains,
-                                                                                                   validityTime,
-                                                                                                   "null",
-                                                                                                   groupId,
-                                                                                                   ownerJsonString);
-            ApiApplicationKey apiApplicationKey = new ApiApplicationKey();
-            apiApplicationKey.setConsumerKey((String) keyDetails.get(APIConstants.FrontEndParameterNames
-                                                                             .CONSUMER_KEY));
-            apiApplicationKey.setConsumerSecret((String) keyDetails.get(
-                    APIConstants.FrontEndParameterNames.CONSUMER_SECRET));
-            return apiApplicationKey;
-        } catch (APIManagementException e) {
-            throw new APIManagerException("Failed to register a api application : " + apiApplicationName, e);
+        ApplicationList applicationList = storeClient.getApplications()
+                .applicationsGet("", applicationName, 1, 0, CONTENT_TYPE, null);
+        Application application;
+        if (applicationList == null || applicationList.getList() == null || applicationList.getList().size() == 0) {
+            //create application;
+            application = new Application();
+            application.setName(applicationName);
+            application.setSubscriber(username);
+            application.setDescription("");
+            application.setThrottlingTier(ApiApplicationConstants.DEFAULT_TIER);
+            application.setGroupId("");
+            application = storeClient.getIndividualApplication().applicationsPost(application, CONTENT_TYPE);
+        } else {
+            ApplicationInfo applicationInfo = applicationList.getList().get(0);
+            application = storeClient.getIndividualApplication()
+                    .applicationsApplicationIdGet(applicationInfo.getApplicationId(), CONTENT_TYPE, null, null);
         }
-    }
-
-    private int createApplication(APIConsumer apiConsumer, String applicationName, String username, String groupId)
-            throws APIManagerException {
-        try {
-            if (apiConsumer != null) {
-                if (apiConsumer.getSubscriber(username) == null) {
-                    String tenantDomain = MultitenantUtils.getTenantDomain(username);
-                    addSubscriber(username, "", groupId, APIManagerUtil.getTenantId(tenantDomain));
-                }
-                Application application = apiConsumer.getApplicationsByName(username, applicationName, groupId);
-                if (application == null) {
-                    Subscriber subscriber = apiConsumer.getSubscriber(username);
-                    application = new Application(applicationName, subscriber);
-                    application.setTier(ApiApplicationConstants.DEFAULT_TIER);
-                    application.setGroupId(groupId);
-                    return apiConsumer.addApplication(application, username);
-                } else {
-                    if (log.isDebugEnabled()) {
-                        log.debug("Application [" + applicationName + "] already exists for Subscriber [" + username +
-                                  "]");
-                    }
-                    return application.getId();
-                }
-            } else {
-                throw new APIManagerException("Failed to retrieve the api consumer for username" + username);
-            }
-        } catch (APIManagementException e) {
-            throw new APIManagerException("Failed to create application [name:" + applicationName + " , username:"
-                                          + username + ", " + "groupId:" + groupId, e);
+        if (application == null) {
+            throw new APIManagerException (
+                    "Api application creation failed for " + applicationName + " to the user " + username);
         }
-    }
 
-    private void addSubscription(APIConsumer apiConsumer, APIIdentifier apiId, int applicationId, String username)
-            throws APIManagerException {
-        try {
-            if (apiConsumer != null) {
-                APIIdentifier apiIdentifier = new APIIdentifier(apiId.getProviderName(), apiId.getApiName(),
-                                                                apiId.getVersion());
-                apiIdentifier.setTier(ApiApplicationConstants.DEFAULT_TIER);
-                apiConsumer.addSubscription(apiIdentifier, username, applicationId);
-                if (log.isDebugEnabled()) {
-                    log.debug("Successfully created subscription for API : " + apiId + " from application : " +
-                              applicationId);
+        SubscriptionList subscriptionList = storeClient.getSubscriptions().subscriptionsGet
+                (null, application.getApplicationId(), "", 0, 100, CONTENT_TYPE, null);
+        List<Subscription> needToSubscribe = new ArrayList<>();
+        // subscribe to apis.
+        if (tags != null && tags.length > 0) {
+            for (String tag: tags) {
+                APIList apiList = storeClient.getApis().apisGet(MAX_API_PER_TAG, 0, tenantDomain, "tag:" + tag
+                        , CONTENT_TYPE, null);
+                if (apiList.getList() == null || apiList.getList().size() == 0) {
+                    apiList = storeClient.getApis().apisGet(MAX_API_PER_TAG, 0
+                            , MultitenantConstants.SUPER_TENANT_DOMAIN_NAME, "tag:" + tag, CONTENT_TYPE, null);
                 }
-            } else {
-                throw new APIManagerException("API provider configured for the given API configuration is null. " +
-                                              "Thus, the API is not published");
-            }
-        } catch (APIManagementException e) {
-            throw new APIManagerException("Failed to create subscription for api name : " + apiId.getApiName(), e);
-        }
-    }
 
-
-    private void addSubscriber(String subscriberName, String subscriberEmail, String groupId, int tenantId)
-            throws APIManagerException {
-        if (log.isDebugEnabled()) {
-            log.debug("Creating subscriber with name  " + subscriberName);
-        }
-        try {
-            APIConsumer consumer = APIManagerFactory.getInstance().getAPIConsumer(subscriberName);
-            if (consumer != null) {
-                synchronized (consumer) {
-                    if (consumer.getSubscriber(subscriberName) == null) {
-                        consumer.addSubscriber(subscriberName, groupId);
-                        if (log.isDebugEnabled()) {
-                            log.debug("Successfully created subscriber with name : " + subscriberName +
-                                              " with groupID : " + groupId);
+                if (apiList.getList() != null && apiList.getList().size() > 0) {
+                    for (APIInfo apiInfo : apiList.getList()) {
+                        String id = apiInfo.getProvider().replace("@", "-AT-")
+                                + "-" + apiInfo.getName()+ "-" + apiInfo.getVersion();
+                        boolean subscriptionExist = false;
+                        if (subscriptionList.getList() != null && subscriptionList.getList().size() > 0) {
+                            for (Subscription subs : subscriptionList.getList()) {
+                                if (subs.getApiIdentifier().equals(id)) {
+                                    subscriptionExist = true;
+                                    break;
+                                }
+                            }
                         }
-                    }
-                }
-            } else {
-                throw new APIManagerException("API provider configured for the given API configuration is null. " +
-                                              "Thus, the API is not published");
-            }
-        } catch (APIManagementException e) {
-            throw new APIManagerException("API provider configured for the given API configuration is null. " +
-                                          "Thus, the API is not published", e);
-        }
-    }
+                        if (!subscriptionExist) {
+                            Subscription subscription = new Subscription();
+                            //fix for APIMANAGER-5566 admin-AT-tenant1.com-Tenant1API1-1.0.0
 
-    /**
-     * This method registers an api application and then subscribe the application to the api.
-     *
-     * @param apiApplicationName name of the application.
-     * @param tags               are used subscribe the apis with the tag.
-     * @param username           subscription is created for the user.
-     * @throws APIManagerException
-     */
-    private int createApplicationAndSubscribeToAPIs(String apiApplicationName, String tags[], String username)
-            throws APIManagerException {
-        try {
-            APIConsumer apiConsumer = APIManagerFactory.getInstance().getAPIConsumer(username);
-            String groupId = getLoggedInUserGroupId(username, APIManagerUtil.getTenantDomain());
-            int applicationId = createApplication(apiConsumer, apiApplicationName, username, groupId);
-            Subscriber subscriber = apiConsumer.getSubscriber(username);
-            Set<API> userVisibleAPIs = null;
-            for (String tag : tags) {
-                Set<API> tagAPIs = apiConsumer.getAPIsWithTag(tag, APIManagerUtil.getTenantDomain());
-                if (userVisibleAPIs == null) {
-                    userVisibleAPIs = tagAPIs;
-                } else {
-                    userVisibleAPIs.addAll(tagAPIs);
-                }
-            }
-            if (userVisibleAPIs != null) {
-                Set<SubscribedAPI> subscribedAPIs = apiConsumer.getSubscribedAPIs(subscriber, apiApplicationName,
-                                                                                  groupId);
-                for (API userVisibleAPI : userVisibleAPIs) {
-                    APIIdentifier apiIdentifier = userVisibleAPI.getId();
-                    boolean isSubscribed = false;
-                    if (subscribedAPIs != null) {
-                        for (SubscribedAPI subscribedAPI : subscribedAPIs) {
-                            if (subscribedAPI.getApiId().equals(apiIdentifier)) {
-                                isSubscribed = true;
+                            subscription.setApiIdentifier(id);
+                            subscription.setApplicationId(application.getApplicationId());
+                            subscription.tier(ApiApplicationConstants.DEFAULT_TIER);
+                            if (!needToSubscribe.contains(subscription)){
+                                needToSubscribe.add(subscription);
                             }
                         }
                     }
-                    if (!isSubscribed) {
-                        addSubscription(apiConsumer, apiIdentifier, applicationId, username);
-                    }
                 }
             }
-            return applicationId;
-        } catch (APIManagementException e) {
-            throw new APIManagerException("Failed to fetch device apis information for the user " + username, e);
         }
-    }
+        if (!needToSubscribe.isEmpty()) {
+            storeClient.getSubscriptionMultitpleApi().subscriptionsMultiplePost(needToSubscribe, CONTENT_TYPE);
+        }
+        //end of subscription
 
-    /**
-     * This method registers an api application and then subscribe the application to the api.
-     *
-     * @param username subscription is created for the user.
-     * @throws APIManagerException
-     */
-    private int createApplicationAndSubscribeToAllAPIs(String apiApplicationName, String username)
-            throws APIManagerException {
-        try {
-            APIConsumer apiConsumer = APIManagerFactory.getInstance().getAPIConsumer(username);
-            String groupId = getLoggedInUserGroupId(username, APIManagerUtil.getTenantDomain());
-            int applicationId = createApplication(apiConsumer, apiApplicationName, username, groupId);
-            String tenantDomain = MultitenantUtils.getTenantDomain(username);
-            Set<API> userVisibleAPIs = apiConsumer.getAllPublishedAPIs(tenantDomain);
-            if (!MultitenantConstants.SUPER_TENANT_DOMAIN_NAME.equals(tenantDomain)) {
-                userVisibleAPIs.addAll(apiConsumer.getAllPublishedAPIs(MultitenantConstants.SUPER_TENANT_DOMAIN_NAME));
-            }
-            Subscriber subscriber = apiConsumer.getSubscriber(username);
-            Set<SubscribedAPI> subscribedAPIs = apiConsumer.getSubscribedAPIs(subscriber);
-            for (API visibleApi : userVisibleAPIs) {
-                APIIdentifier apiIdentifier = visibleApi.getId();
-                boolean isSubscribed = false;
-                for (SubscribedAPI subscribedAPI : subscribedAPIs) {
-                    if (subscribedAPI.getApiId().equals(apiIdentifier)) {
-                        isSubscribed = true;
-                    }
-                }
-                if (!isSubscribed) {
-                    addSubscription(apiConsumer, apiIdentifier, applicationId, username);
+        List<ApplicationKey> applicationKeys = application.getKeys();
+        if (applicationKeys != null) {
+            for (ApplicationKey applicationKey : applicationKeys) {
+                if (keyType.equals(applicationKey.getKeyType().toString())) {
+                    ApiApplicationKey apiApplicationKey = new ApiApplicationKey();
+                    apiApplicationKey.setConsumerKey(applicationKey.getConsumerKey());
+                    apiApplicationKey.setConsumerSecret(applicationKey.getConsumerSecret());
+                    return apiApplicationKey;
                 }
             }
-            return applicationId;
-        } catch (APIManagementException e) {
-            throw new APIManagerException("Failed to fetch device apis information for the user " + username, e);
         }
-    }
 
-    private String getLoggedInUserGroupId(String username, String tenantDomain) throws APIManagerException {
-        JSONObject loginInfoJsonObj = new JSONObject();
-        try {
-            APIConsumer apiConsumer = APIManagerFactory.getInstance().getAPIConsumer(username);
-            loginInfoJsonObj.put("user", username);
-            if (MultitenantConstants.SUPER_TENANT_DOMAIN_NAME.equals(tenantDomain)) {
-                loginInfoJsonObj.put("isSuperTenant", true);
-            } else {
-                loginInfoJsonObj.put("isSuperTenant", false);
-            }
-            String loginInfoString = loginInfoJsonObj.toString();
-            return apiConsumer.getGroupIds(loginInfoString);
-        } catch (APIManagementException e) {
-            throw new APIManagerException("Unable to get groupIds of user " + username, e);
+        ApplicationKeyGenerateRequest applicationKeyGenerateRequest = new ApplicationKeyGenerateRequest();
+        List<String> allowedDomains = new ArrayList<>();
+        if (isAllowedAllDomains) {
+            allowedDomains.add(ApiApplicationConstants.ALLOWED_DOMAINS);
+        } else {
+            allowedDomains.add(APIManagerUtil.getTenantDomain());
         }
+        applicationKeyGenerateRequest.setAccessAllowDomains(allowedDomains);
+        applicationKeyGenerateRequest.setCallbackUrl("");
+        applicationKeyGenerateRequest.setKeyType(ApplicationKeyGenerateRequest.KeyTypeEnum.PRODUCTION);
+        applicationKeyGenerateRequest.setValidityTime(validityTime);
+
+        ApplicationKey applicationKey = storeClient.getIndividualApplication().applicationsGenerateKeysPost(
+                application.getApplicationId(), applicationKeyGenerateRequest, CONTENT_TYPE, null, null);
+        ApiApplicationKey apiApplicationKey = new ApiApplicationKey();
+        apiApplicationKey.setConsumerKey(applicationKey.getConsumerKey());
+        apiApplicationKey.setConsumerSecret(applicationKey.getConsumerSecret());
+        return apiApplicationKey;
     }
 
 }

@@ -22,8 +22,8 @@ package org.wso2.carbon.policy.mgt.core.impl;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.device.mgt.common.group.mgt.DeviceGroup;
-import org.wso2.carbon.policy.mgt.common.DeviceGroupWrapper;
-import org.wso2.carbon.policy.mgt.common.Policy;
+import org.wso2.carbon.device.mgt.common.policy.mgt.DeviceGroupWrapper;
+import org.wso2.carbon.device.mgt.common.policy.mgt.Policy;
 import org.wso2.carbon.policy.mgt.common.PolicyFilter;
 import org.wso2.carbon.policy.mgt.core.util.PolicyManagementConstants;
 
@@ -70,13 +70,16 @@ public class PolicyFilterImpl implements PolicyFilter {
         Map<Integer, Policy> policyMap = new HashMap<>();
         for (Policy policy : policies) {
             List<DeviceGroupWrapper> wrappers = policy.getDeviceGroups();
-            if (PolicyManagementConstants.ANY.equalsIgnoreCase(wrappers.get(0).getName())) {
+            if (wrappers.isEmpty()) {
+                temp.add(policy);
+                continue;
+            } else if (PolicyManagementConstants.ANY.equalsIgnoreCase(wrappers.get(0).getName())) {
                 temp.add(policy);
                 policyMap.put(policy.getId(), policy);
                 continue;
             } else {
                 for (DeviceGroupWrapper deviceGroupWrapper : wrappers) {
-                    if (groupMap.containsKey(deviceGroupWrapper.getId()) && policyMap.containsKey(policy.getId())) {
+                    if (groupMap.containsKey(deviceGroupWrapper.getId()) && !policyMap.containsKey(policy.getId())) {
                         temp.add(policy);
                         policyMap.put(policy.getId(), policy);
                     }
@@ -140,6 +143,9 @@ public class PolicyFilterImpl implements PolicyFilter {
     @Override
     public List<Policy> filterOwnershipTypeBasedPolicies(String ownershipType, List<Policy> policies) {
 
+        if (ownershipType == null) {
+            return policies;
+        }
         if (log.isDebugEnabled()) {
             log.debug("No of policies went in to filterOwnershipTypeBasedPolicies : " + policies.size());
             log.debug("Ownership type : " + ownershipType);
@@ -150,7 +156,7 @@ public class PolicyFilterImpl implements PolicyFilter {
 
         List<Policy> temp = new ArrayList<Policy>();
         for (Policy policy : policies) {
-            if (ownershipType.equalsIgnoreCase(policy.getOwnershipType()) ||
+            if (policy.getOwnershipType() == null || ownershipType.equalsIgnoreCase(policy.getOwnershipType()) ||
                     PolicyManagementConstants.ANY.equalsIgnoreCase(policy.getOwnershipType())) {
                 temp.add(policy);
             }

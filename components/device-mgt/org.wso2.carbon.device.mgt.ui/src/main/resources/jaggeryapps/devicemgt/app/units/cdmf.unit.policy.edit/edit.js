@@ -17,20 +17,51 @@
  */
 
 function onRequest(context) {
-    var log = new Log("policy-view-edit-unit backend js");
-    log.debug("calling policy-view-edit-unit");
-
+    var deviceType = request.getParameter("deviceType");
+    var utility = require("/app/modules/utility.js").utility;
     var userModule = require("/app/modules/business-controllers/user.js")["userModule"];
+    var groupModule = require("/app/modules/business-controllers/group.js")["groupModule"];
 
     var rolesResult = userModule.getRoles();
     if (rolesResult.status == "success") {
-        viewModel.roles = rolesResult.content;
+        context.roles = rolesResult.content;
     }
 
     var usersResult = userModule.getUsers();
     if (usersResult.status == "success") {
-        viewModel.users = usersResult.content;
+        context.users = usersResult.content;
     }
-    viewModel.isAuthorized = userModule.isAuthorized("/permission/admin/device-mgt/policies/manage");
-    return viewModel;
+    context["groups"] = groupModule.getGroups();
+    var user = userModule.getCarbonUser();
+    context["user"] = {username: user.username, domain: user.domain, tenantId: user.tenantId};
+
+    context["policyOperations"] = {};
+    var policyEditSrc = "/app/units/" + utility.getTenantedDeviceUnitName(deviceType, "policy-edit");
+    if (new File(policyEditSrc).isExists()) {
+        var policyOperationsTemplateSrc = policyEditSrc + "/public/templates/" + deviceType + "-policy-edit.hbs";
+        if (new File(policyOperationsTemplateSrc).isExists()) {
+            context["policyOperations"].template = "/public/cdmf.unit.device.type." + deviceType +
+                ".policy-edit/templates/" + deviceType + "-policy-edit.hbs";
+        }
+        var policyOperationsScriptSrc = policyEditSrc + "/public/js/" + deviceType + "-policy-edit.js";
+        if (new File(policyOperationsScriptSrc).isExists()) {
+            context["policyOperations"].script = "/public/cdmf.unit.device.type." + deviceType + ".policy-edit/js/" +
+                deviceType + "-policy-edit.js";
+        }
+        var policyOperationsStylesSrc = policyEditSrc + "/public/css/" + deviceType + "-policy-edit.css";
+        if (new File(policyOperationsStylesSrc).isExists()) {
+            context["policyOperations"].style = "/public/cdmf.unit.device.type." + deviceType + ".policy-edit/css/" +
+                deviceType + "-policy-edit.css";
+        }
+    }
+
+    context.isAuthorized = userModule.isAuthorized("/permission/admin/device-mgt/policies/manage");
+    context.isAuthorizedViewUsers = userModule.isAuthorized("/permission/admin/device-mgt/roles/view");
+    context.isAuthorizedViewRoles = userModule.isAuthorized("/permission/admin/device-mgt/users/view");
+    context.isAuthorizedViewGroups = userModule.isAuthorized("/permission/admin/device-mgt/groups/view");
+
+    var devicemgtProps = require("/app/modules/conf-reader/main.js")["conf"];
+    context["isCloud"] = devicemgtProps.isCloud;
+
+    return context;
 }

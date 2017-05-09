@@ -15,4 +15,11 @@
   specific language governing permissions and limitations
   under the License.
 }}
-{{#zone "productName"}}CDMF BASE APP{{/zone}}
+
+{{#if isCloud}}
+    {{#zone "productName"}}Cloud{{/zone}}
+    {{#zone "productNameResponsive"}}Cloud{{/zone}}
+{{else}}
+    {{#zone "productName"}}IoT Server{{/zone}}
+    {{#zone "productNameResponsive"}} IoTS{{/zone}}
+{{/if}}

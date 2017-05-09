@@ -35,28 +35,32 @@
 {{/zone}}
 
 {{#zone "navbarActions"}}
+    {{#unless isCloud}}
     <li>
         <!--suppress HtmlUnknownTarget -->
         <a href="{{@app.context}}/user/add">
             <span class="icon fw-stack">
                 <i class="fw fw-add fw-stack-1x"></i>
-                <i class="fw fw-ring fw-stack-2x"></i>
+                <i class="fw fw-circle-outline fw-stack-2x"></i>
             </span>
             Add User
         </a>
     </li>
+    {{/unless}}
 {{/zone}}
 
 {{#zone "content"}}
     <input type="hidden" id="user" value="{{user.username}}">
     <!-- content -->
     <div id="loading-content" class="col-centered">
-        {{#if canManage}}
-            <input type="hidden" id="can-remove" value="true"/>
-            <input type="hidden" id="can-edit" value="true"/>
-            <input type="hidden" id="can-invite" value="true"/>
-            <input type="hidden" id="can-reset-password" value="true"/>
-        {{/if}}
+        {{#unless isCloud}}
+            {{#if canManage}}
+                <input type="hidden" id="can-remove" value="true"/>
+                <input type="hidden" id="can-edit" value="true"/>
+                <input type="hidden" id="can-invite" value="true"/>
+                <input type="hidden" id="can-reset-password" value="true"/>
+            {{/if}}
+        {{/unless}}
         {{#if canView}}
             <input type="hidden" id="can-view" value="true"/>
         {{/if}}
@@ -108,14 +112,24 @@
             Enter new password
             <br><br>
             <div>
+<<<<<<< HEAD
                 <input type="password" autocomplete="off" class="form-control modal-input operationDataKeys new-password"
+=======
+                <input type="password" autocomplete="off"
+                       class="form-control modal-input operationDataKeys new-password"
+>>>>>>> 964eae6f92d87baed3557b4f72bebe4bd5b4d832
                        data-key="message"/>
             </div>
             <br>
             Retype new password
             <br><br>
             <div>
+<<<<<<< HEAD
                 <input type="password" autocomplete="off" class="form-control modal-input operationDataKeys confirmed-password"
+=======
+                <input type="password" autocomplete="off"
+                       class="form-control modal-input operationDataKeys confirmed-password"
+>>>>>>> 964eae6f92d87baed3557b4f72bebe4bd5b4d832
                        data-key="message"/>
             </div>
             <br>

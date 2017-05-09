@@ -17,28 +17,59 @@
  */
 package org.wso2.carbon.device.mgt.core.service;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.wso2.carbon.CarbonConstants;
 import org.wso2.carbon.context.CarbonContext;
-import org.wso2.carbon.device.mgt.common.*;
+import org.wso2.carbon.context.PrivilegedCarbonContext;
+import org.wso2.carbon.device.mgt.common.Device;
+import org.wso2.carbon.device.mgt.common.DeviceIdentifier;
+import org.wso2.carbon.device.mgt.common.DeviceManagementException;
+import org.wso2.carbon.device.mgt.common.DeviceManager;
+import org.wso2.carbon.device.mgt.common.DeviceNotFoundException;
+import org.wso2.carbon.device.mgt.common.DeviceTypeIdentifier;
+import org.wso2.carbon.device.mgt.common.EnrolmentInfo;
+import org.wso2.carbon.device.mgt.common.FeatureManager;
+import org.wso2.carbon.device.mgt.common.InitialOperationConfig;
+import org.wso2.carbon.device.mgt.common.InvalidDeviceException;
+import org.wso2.carbon.device.mgt.common.MonitoringOperation;
+import org.wso2.carbon.device.mgt.common.OperationMonitoringTaskConfig;
+import org.wso2.carbon.device.mgt.common.PaginationRequest;
+import org.wso2.carbon.device.mgt.common.PaginationResult;
+import org.wso2.carbon.device.mgt.common.TransactionManagementException;
 import org.wso2.carbon.device.mgt.common.app.mgt.Application;
 import org.wso2.carbon.device.mgt.common.configuration.mgt.PlatformConfiguration;
 import org.wso2.carbon.device.mgt.common.device.details.DeviceInfo;
 import org.wso2.carbon.device.mgt.common.device.details.DeviceLocation;
+import org.wso2.carbon.device.mgt.common.group.mgt.DeviceGroup;
+import org.wso2.carbon.device.mgt.common.group.mgt.DeviceGroupConstants;
+import org.wso2.carbon.device.mgt.common.group.mgt.GroupAlreadyExistException;
+import org.wso2.carbon.device.mgt.common.group.mgt.GroupManagementException;
 import org.wso2.carbon.device.mgt.common.license.mgt.License;
 import org.wso2.carbon.device.mgt.common.license.mgt.LicenseManagementException;
 import org.wso2.carbon.device.mgt.common.operation.mgt.Activity;
 import org.wso2.carbon.device.mgt.common.operation.mgt.Operation;
 import org.wso2.carbon.device.mgt.common.operation.mgt.OperationManagementException;
+import org.wso2.carbon.device.mgt.common.operation.mgt.OperationManager;
+import org.wso2.carbon.device.mgt.common.policy.mgt.PolicyMonitoringManager;
+import org.wso2.carbon.device.mgt.common.push.notification.NotificationStrategy;
 import org.wso2.carbon.device.mgt.common.spi.DeviceManagementService;
+import org.wso2.carbon.device.mgt.core.DeviceManagementConstants;
 import org.wso2.carbon.device.mgt.core.DeviceManagementPluginRepository;
-import org.wso2.carbon.device.mgt.core.dao.*;
+import org.wso2.carbon.device.mgt.core.dao.ApplicationDAO;
+import org.wso2.carbon.device.mgt.core.dao.DeviceDAO;
+import org.wso2.carbon.device.mgt.core.dao.DeviceManagementDAOException;
+import org.wso2.carbon.device.mgt.core.dao.DeviceManagementDAOFactory;
+import org.wso2.carbon.device.mgt.core.dao.DeviceTypeDAO;
+import org.wso2.carbon.device.mgt.core.dao.EnrollmentDAO;
 import org.wso2.carbon.device.mgt.core.device.details.mgt.dao.DeviceDetailsDAO;
 import org.wso2.carbon.device.mgt.core.device.details.mgt.dao.DeviceDetailsMgtDAOException;
 import org.wso2.carbon.device.mgt.core.dto.DeviceType;
 import org.wso2.carbon.device.mgt.core.internal.DeviceManagementDataHolder;
 import org.wso2.carbon.device.mgt.core.internal.DeviceManagementServiceComponent;
 import org.wso2.carbon.device.mgt.core.internal.PluginInitializationListener;
+import org.wso2.carbon.device.mgt.core.operation.mgt.CommandOperation;
 import org.wso2.carbon.device.mgt.core.util.DeviceManagerUtil;
 import org.wso2.carbon.email.sender.core.ContentProviderInfo;
 import org.wso2.carbon.email.sender.core.EmailContext;
@@ -47,7 +78,15 @@ import org.wso2.carbon.email.sender.core.TypedValue;
 import org.wso2.carbon.user.api.UserStoreException;
 
 import java.sql.SQLException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
 
 public class DeviceManagementProviderServiceImpl implements DeviceManagementProviderService,
         PluginInitializationListener {
@@ -130,7 +169,6 @@ public class DeviceManagementProviderServiceImpl implements DeviceManagementProv
             return false;
         }
         deviceManager.enrollDevice(device);
-
         if (deviceManager.isClaimable(deviceIdentifier)) {
             device.getEnrolmentInfo().setStatus(EnrolmentInfo.Status.INACTIVE);
         } else {
@@ -221,6 +259,11 @@ public class DeviceManagementProviderServiceImpl implements DeviceManagementProv
             status = true;
         }
 
+        if (status) {
+            addDeviceToGroups(deviceIdentifier, device.getEnrolmentInfo().getOwnership());
+            addInitialOperations(deviceIdentifier, device.getType());
+
+        }
         return status;
     }
 
@@ -242,8 +285,12 @@ public class DeviceManagementProviderServiceImpl implements DeviceManagementProv
             DeviceManagementDAOFactory.beginTransaction();
             Device currentDevice = deviceDAO.getDevice(deviceIdentifier, tenantId);
             device.setId(currentDevice.getId());
-            device.getEnrolmentInfo().setId(currentDevice.getEnrolmentInfo().getId());
-
+            if (device.getEnrolmentInfo().getId() == 0) {
+                device.getEnrolmentInfo().setId(currentDevice.getEnrolmentInfo().getId());
+            }
+            if (device.getName() == null) {
+                device.setName(currentDevice.getName());
+            }
             deviceDAO.updateDevice(device, tenantId);
             enrollmentDAO.updateEnrollment(device.getEnrolmentInfo());
             DeviceManagementDAOFactory.commitTransaction();
@@ -326,15 +373,21 @@ public class DeviceManagementProviderServiceImpl implements DeviceManagementProv
 
     @Override
     public boolean isEnrolled(DeviceIdentifier deviceId) throws DeviceManagementException {
-        DeviceManager deviceManager = this.getDeviceManager(deviceId.getType());
-        if (deviceManager == null) {
-            if (log.isDebugEnabled()) {
-                log.debug("Device Manager associated with the device type '" + deviceId.getType() + "' is null. " +
-                        "Therefore, not attempting method 'isEnrolled'");
+        try {
+            DeviceManagementDAOFactory.openConnection();
+            Device device = deviceDAO.getDevice(deviceId, this.getTenantId());
+            if (device != null) {
+                return true;
             }
-            return false;
+        } catch (DeviceManagementDAOException e) {
+            throw new DeviceManagementException("Error occurred while obtaining the enrollment information device for" +
+                    "id '" + deviceId.getId() + "'", e);
+        } catch (SQLException e) {
+            throw new DeviceManagementException("Error occurred while opening a connection to the data source", e);
+        } finally {
+            DeviceManagementDAOFactory.closeConnection();
         }
-        return deviceManager.isEnrolled(deviceId);
+        return false;
     }
 
     @Override
@@ -563,12 +616,17 @@ public class DeviceManagementProviderServiceImpl implements DeviceManagementProv
 
     @Override
     public PaginationResult getAllDevices(PaginationRequest request) throws DeviceManagementException {
+        List<Device> devicesForRoles = null;
         PaginationResult paginationResult = new PaginationResult();
         List<Device> devices = new ArrayList<>();
         List<Device> allDevices = new ArrayList<>();
         int count = 0;
         int tenantId = this.getTenantId();
         request = DeviceManagerUtil.validateDeviceListPageSize(request);
+        if (!StringUtils.isEmpty(request.getOwnerRole())) {
+            devicesForRoles = DeviceManagementDataHolder.getInstance().getDeviceManagementProvider()
+                    .getAllDevicesOfRole(request.getOwnerRole());
+        }
         try {
             DeviceManagementDAOFactory.openConnection();
             allDevices = deviceDAO.getDevices(request, tenantId);
@@ -581,6 +639,20 @@ public class DeviceManagementProviderServiceImpl implements DeviceManagementProv
         } finally {
             DeviceManagementDAOFactory.closeConnection();
         }
+
+        devices = processDevices(devices, allDevices);
+
+        if (devicesForRoles != null) {
+            count += devicesForRoles.size();
+            devices = processDevices(devices, devicesForRoles);
+        }
+        paginationResult.setData(devices);
+        paginationResult.setRecordsFiltered(count);
+        paginationResult.setRecordsTotal(count);
+        return paginationResult;
+    }
+
+    private List<Device> processDevices(List<Device> devices, List<Device> allDevices) throws DeviceManagementException {
         for (Device device : allDevices) {
             DeviceInfo info = null;
             try {
@@ -631,10 +703,7 @@ public class DeviceManagementProviderServiceImpl implements DeviceManagementProv
             }
             devices.add(device);
         }
-        paginationResult.setData(devices);
-        paginationResult.setRecordsFiltered(count);
-        paginationResult.setRecordsTotal(count);
-        return paginationResult;
+        return devices;
     }
 
     @Override
@@ -712,21 +781,25 @@ public class DeviceManagementProviderServiceImpl implements DeviceManagementProv
     }
 
     @Override
-    public void sendEnrolmentInvitation(EmailMetaInfo metaInfo) throws DeviceManagementException {
+    public void sendEnrolmentInvitation(String templateName, EmailMetaInfo metaInfo) throws DeviceManagementException {
         Map<String, TypedValue<Class<?>, Object>> params = new HashMap<>();
-        params.put(org.wso2.carbon.device.mgt.core.DeviceManagementConstants.EmailAttributes.FIRST_NAME,
-                new TypedValue<Class<?>, Object>(String.class, metaInfo.getProperty("first-name")));
+        Properties props = metaInfo.getProperties();
+        Enumeration e = props.propertyNames();
+        while (e.hasMoreElements()) {
+            String key = (String) e.nextElement();
+            params.put(key, new TypedValue<Class<?>, Object>(String.class, props.getProperty(key)));
+        }
         params.put(org.wso2.carbon.device.mgt.core.DeviceManagementConstants.EmailAttributes.SERVER_BASE_URL_HTTPS,
                 new TypedValue<Class<?>, Object>(String.class, DeviceManagerUtil.getServerBaseHttpsUrl()));
         params.put(org.wso2.carbon.device.mgt.core.DeviceManagementConstants.EmailAttributes.SERVER_BASE_URL_HTTP,
                 new TypedValue<Class<?>, Object>(String.class, DeviceManagerUtil.getServerBaseHttpUrl()));
         try {
             EmailContext ctx =
-                    new EmailContext.EmailContextBuilder(new ContentProviderInfo("user-enrollment", params),
+                    new EmailContext.EmailContextBuilder(new ContentProviderInfo(templateName, params),
                             metaInfo.getRecipients()).build();
             DeviceManagementDataHolder.getInstance().getEmailSenderService().sendEmail(ctx);
-        } catch (EmailSendingFailedException e) {
-            throw new DeviceManagementException("Error occurred while sending enrollment invitation", e);
+        } catch (EmailSendingFailedException ex) {
+            throw new DeviceManagementException("Error occurred while sending enrollment invitation", ex);
         }
     }
 
@@ -747,7 +820,10 @@ public class DeviceManagementProviderServiceImpl implements DeviceManagementProv
                 new TypedValue<Class<?>, Object>(String.class, DeviceManagerUtil.getServerBaseHttpUrl()));
         try {
             EmailContext ctx =
-                    new EmailContext.EmailContextBuilder(new ContentProviderInfo("user-registration", params),
+                    new EmailContext.EmailContextBuilder(
+                            new ContentProviderInfo(
+                                    DeviceManagementConstants.EmailAttributes.USER_REGISTRATION_TEMPLATE,
+                                    params),
                             metaInfo.getRecipients()).build();
             DeviceManagementDataHolder.getInstance().getEmailSenderService().sendEmail(ctx);
         } catch (EmailSendingFailedException e) {
@@ -786,9 +862,10 @@ public class DeviceManagementProviderServiceImpl implements DeviceManagementProv
             DeviceManagementDAOFactory.openConnection();
             device = deviceDAO.getDevice(deviceId, this.getTenantId());
             if (device == null) {
+                String msg = "No device is found upon the type '" + deviceId.getType() + "' and id '" +
+                        deviceId.getId() + "'";
                 if (log.isDebugEnabled()) {
-                    log.debug("No device is found upon the type '" + deviceId.getType() + "' and id '" +
-                            deviceId.getId() + "'");
+                    log.debug(msg);
                 }
                 return null;
             }
@@ -838,7 +915,7 @@ public class DeviceManagementProviderServiceImpl implements DeviceManagementProv
             if (device == null) {
                 if (log.isDebugEnabled()) {
                     log.debug("No device is found upon the type '" + deviceId.getType() + "' and id '" +
-                              deviceId.getId() + "'");
+                            deviceId.getId() + "'");
                 }
                 return null;
             }
@@ -851,7 +928,7 @@ public class DeviceManagementProviderServiceImpl implements DeviceManagementProv
             device.setApplications(applications);
         } catch (DeviceManagementDAOException e) {
             throw new DeviceManagementException("Error occurred while obtaining the device for id " +
-                                                "'" + deviceId.getId() + "'", e);
+                    "'" + deviceId.getId() + "'", e);
         } catch (SQLException e) {
             throw new DeviceManagementException("Error occurred while opening a connection to the data source", e);
         } catch (DeviceDetailsMgtDAOException e) {
@@ -865,7 +942,7 @@ public class DeviceManagementProviderServiceImpl implements DeviceManagementProv
         if (deviceManager == null) {
             if (log.isDebugEnabled()) {
                 log.debug("Device Manager associated with the device type '" + deviceId.getType() + "' is null. " +
-                          "Therefore, not attempting method 'getDevice'");
+                        "Therefore, not attempting method 'getDevice'");
             }
             return device;
         }
@@ -1179,12 +1256,113 @@ public class DeviceManagementProviderServiceImpl implements DeviceManagementProv
     }
 
     @Override
+    public List<MonitoringOperation> getMonitoringOperationList(String deviceType) {
+        int tenantId = PrivilegedCarbonContext.getThreadLocalCarbonContext().getTenantId();
+
+        DeviceManagementService dms = pluginRepository.getDeviceManagementService(deviceType, tenantId);
+
+        OperationMonitoringTaskConfig operationMonitoringTaskConfig = dms.getOperationMonitoringConfig();
+        return operationMonitoringTaskConfig.getMonitoringOperation();
+    }
+
+    @Override
+    public int getDeviceMonitoringFrequency(String deviceType) {
+        int tenantId = PrivilegedCarbonContext.getThreadLocalCarbonContext().getTenantId();
+        DeviceManagementService dms = pluginRepository.getDeviceManagementService(deviceType, tenantId);
+        OperationMonitoringTaskConfig operationMonitoringTaskConfig = dms.getOperationMonitoringConfig();
+        return operationMonitoringTaskConfig.getFrequency();
+    }
+
+    @Override
+    public boolean isDeviceMonitoringEnabled(String deviceType) {
+        int tenantId = PrivilegedCarbonContext.getThreadLocalCarbonContext().getTenantId();
+        DeviceManagementService dms = pluginRepository.getDeviceManagementService(deviceType, tenantId);
+        OperationMonitoringTaskConfig operationMonitoringTaskConfig = dms.getOperationMonitoringConfig();
+        return operationMonitoringTaskConfig.isEnabled();
+    }
+
+    @Override
+    public PolicyMonitoringManager getPolicyMonitoringManager(String deviceType) {
+        int tenantId = PrivilegedCarbonContext.getThreadLocalCarbonContext().getTenantId();
+        DeviceManagementService dms = pluginRepository.getDeviceManagementService(deviceType, tenantId);
+        return dms.getPolicyMonitoringManager();
+    }
+
+    @Override
     public List<Device> getDevicesOfUser(String username) throws DeviceManagementException {
         List<Device> devices = new ArrayList<>();
         List<Device> userDevices;
         try {
             DeviceManagementDAOFactory.openConnection();
             userDevices = deviceDAO.getDevicesOfUser(username, this.getTenantId());
+        } catch (DeviceManagementDAOException e) {
+            throw new DeviceManagementException("Error occurred while retrieving the list of devices that " +
+                    "belong to the user '" + username + "'", e);
+        } catch (SQLException e) {
+            throw new DeviceManagementException("Error occurred while opening a connection to the data source", e);
+        } finally {
+            DeviceManagementDAOFactory.closeConnection();
+        }
+
+        for (Device device : userDevices) {
+            DeviceInfo info = null;
+            try {
+                DeviceManagementDAOFactory.openConnection();
+                info = deviceInfoDAO.getDeviceInformation(device.getId());
+                DeviceLocation location = deviceInfoDAO.getDeviceLocation(device.getId());
+                if (info != null) {
+                    info.setLocation(location);
+                }
+            } catch (DeviceDetailsMgtDAOException e) {
+                log.error("Error occurred while retrieving advance info of '" + device.getType() +
+                        "' that carries the id '" + device.getDeviceIdentifier() + "'");
+            } catch (SQLException e) {
+                log.error("Error occurred while opening a connection to the data source", e);
+            } finally {
+                DeviceManagementDAOFactory.closeConnection();
+            }
+            device.setDeviceInfo(info);
+
+            try {
+                DeviceManagementDAOFactory.openConnection();
+                List<Application> applications = applicationDAO.getInstalledApplications(device.getId());
+                device.setApplications(applications);
+            } catch (DeviceManagementDAOException e) {
+                log.error("Error occurred while retrieving the application list of '" + device.getType() + "', " +
+                        "which carries the id '" + device.getId() + "'", e);
+            } catch (SQLException e) {
+                log.error("Error occurred while opening a connection to the data source", e);
+            } finally {
+                DeviceManagementDAOFactory.closeConnection();
+            }
+
+            DeviceManager deviceManager = this.getDeviceManager(device.getType());
+            if (deviceManager == null) {
+                if (log.isDebugEnabled()) {
+                    log.debug("Device Manager associated with the device type '" + device.getType() + "' is null. " +
+                            "Therefore, not attempting method 'isEnrolled'");
+                }
+                devices.add(device);
+                continue;
+            }
+            Device dmsDevice =
+                    deviceManager.getDevice(new DeviceIdentifier(device.getDeviceIdentifier(), device.getType()));
+            if (dmsDevice != null) {
+                device.setFeatures(dmsDevice.getFeatures());
+                device.setProperties(dmsDevice.getProperties());
+            }
+            devices.add(device);
+        }
+        return devices;
+    }
+
+    @Override
+    public List<Device> getDevicesOfUser(String username, String deviceType) throws DeviceManagementException {
+        List<Device> devices = new ArrayList<>();
+        List<Device> userDevices;
+        try {
+            DeviceManagementDAOFactory.openConnection();
+            userDevices = deviceDAO.getDevicesOfUser(username, deviceType, this.getTenantId());
         } catch (DeviceManagementDAOException e) {
             throw new DeviceManagementException("Error occurred while retrieving the list of devices that " +
                     "belong to the user '" + username + "'", e);
@@ -1788,7 +1966,7 @@ public class DeviceManagementProviderServiceImpl implements DeviceManagementProv
             }
         } catch (DeviceManagementDAOException e) {
             throw new DeviceManagementException("Error occurred while obtaining the enrollment information device for" +
-                                                        "id '" + deviceId.getId() + "' and user : " + user, e);
+                    "id '" + deviceId.getId() + "' and user : " + user, e);
         } catch (SQLException e) {
             throw new DeviceManagementException("Error occurred while opening a connection to the data source", e);
         } finally {
@@ -1796,6 +1974,79 @@ public class DeviceManagementProviderServiceImpl implements DeviceManagementProv
         }
         return false;
     }
+
+    @Override
+    public NotificationStrategy getNotificationStrategyByDeviceType(String deviceType) throws DeviceManagementException {
+        int tenantId = PrivilegedCarbonContext.getThreadLocalCarbonContext().getTenantId();
+        OperationManager operationManager = pluginRepository.getOperationManager(deviceType, tenantId);
+        if (operationManager != null) {
+            return operationManager.getNotificationStrategy();
+        } else {
+            throw new DeviceManagementException("Cannot find operation manager for given device type :" + deviceType);
+        }
+    }
+
+    /**
+     * Change device status.
+     *
+     * @param deviceIdentifier {@link DeviceIdentifier} object
+     * @param newStatus        New status of the device
+     * @return Whether status is changed or not
+     * @throws DeviceManagementException on errors while trying to change device status
+     */
+    @Override
+    public boolean changeDeviceStatus(DeviceIdentifier deviceIdentifier, EnrolmentInfo.Status newStatus)
+            throws DeviceManagementException {
+        boolean isDeviceUpdated = false;
+        Device device = getDevice(deviceIdentifier);
+        int deviceId = device.getId();
+        EnrolmentInfo enrolmentInfo = device.getEnrolmentInfo();
+        enrolmentInfo.setStatus(newStatus);
+        int tenantId = this.getTenantId();
+        switch (newStatus) {
+            case ACTIVE:
+                isDeviceUpdated = updateEnrollment(deviceId, enrolmentInfo, tenantId);
+                break;
+            case INACTIVE:
+                isDeviceUpdated = updateEnrollment(deviceId, enrolmentInfo, tenantId);
+                break;
+            case REMOVED:
+                isDeviceUpdated = disenrollDevice(deviceIdentifier);
+                break;
+            default:
+                throw new DeviceManagementException("Invalid status retrieved. Status : " + newStatus);
+        }
+        return isDeviceUpdated;
+    }
+
+    private boolean updateEnrollment(int deviceId, EnrolmentInfo enrolmentInfo, int tenantId)
+            throws DeviceManagementException {
+        boolean isUpdatedEnrollment = false;
+        boolean isAutoCommit = true;
+        try {
+            DeviceManagementDAOFactory.openConnection();
+            isAutoCommit = DeviceManagementDAOFactory.getConnection().getAutoCommit();
+            DeviceManagementDAOFactory.getConnection().setAutoCommit(true);
+            int updatedRows = enrollmentDAO.updateEnrollment(deviceId, enrolmentInfo, tenantId);
+            if (updatedRows > 0) {
+                isUpdatedEnrollment = true;
+            }
+        } catch (SQLException e) {
+            throw new DeviceManagementException("Error occurred while opening a connection to the data source", e);
+        } catch (DeviceManagementDAOException e) {
+            throw new DeviceManagementException("Error occurred while updating the enrollment information device for" +
+                    "id '" + deviceId + "' .", e);
+        } finally {
+            try {
+                DeviceManagementDAOFactory.getConnection().setAutoCommit(isAutoCommit);
+            } catch (SQLException e) {
+                log.error("Exception occurred while setting auto commit.");
+            }
+            DeviceManagementDAOFactory.closeConnection();
+        }
+        return isUpdatedEnrollment;
+    }
+
 
     private int getTenantId() {
         return CarbonContext.getThreadLocalCarbonContext().getTenantId();
@@ -1828,4 +2079,90 @@ public class DeviceManagementProviderServiceImpl implements DeviceManagementProv
         return deviceManagementService.getDeviceManager();
     }
 
+    /**
+     * Adds the enrolled devices to the default groups based on ownership
+     *
+     * @param deviceIdentifier of the device.
+     * @param ownership        of the device.
+     * @throws DeviceManagementException If error occurred in adding the device to the group.
+     */
+    private void addDeviceToGroups(DeviceIdentifier deviceIdentifier, EnrolmentInfo.OwnerShip ownership)
+            throws DeviceManagementException {
+        GroupManagementProviderService groupManagementProviderService = new GroupManagementProviderServiceImpl();
+        try {
+            DeviceGroup defaultGroup = createDefaultGroup(groupManagementProviderService, ownership.toString());
+            if (defaultGroup != null) {
+                List<DeviceIdentifier> deviceIdentifiers = new ArrayList<>();
+                deviceIdentifiers.add(deviceIdentifier);
+                groupManagementProviderService.addDevices(defaultGroup.getGroupId(), deviceIdentifiers);
+            }
+        } catch (DeviceNotFoundException e) {
+            throw new DeviceManagementException("Unable to find the device with the id: '" + deviceIdentifier.getId(),
+                    e);
+        } catch (GroupManagementException e) {
+            throw new DeviceManagementException("An error occurred when adding the device to the group.", e);
+        }
+    }
+
+    private void addInitialOperations(DeviceIdentifier deviceIdentifier, String deviceType) throws DeviceManagementException {
+        DeviceManagementProviderService deviceManagementProviderService = DeviceManagementDataHolder.getInstance().
+                getDeviceManagementProvider();
+        DeviceManagementService deviceManagementService =
+                pluginRepository.getDeviceManagementService(deviceType, this.getTenantId());
+        InitialOperationConfig init = deviceManagementService.getInitialOperationConfig();
+        List<DeviceIdentifier> deviceIdentifiers = new ArrayList<>();
+        deviceIdentifiers.add(deviceIdentifier);
+        if (init != null) {
+            List<String> initialOperations = init.getOperations();
+
+            for (String str : initialOperations) {
+                CommandOperation operation = new CommandOperation();
+                operation.setEnabled(true);
+                operation.setType(Operation.Type.COMMAND);
+                operation.setCode(str);
+                try {
+                    deviceManagementProviderService.
+                            addOperation(deviceType,
+                                    operation, deviceIdentifiers);
+                } catch (OperationManagementException e) {
+                    throw new DeviceManagementException("Unable to find the device with the id: '" + deviceIdentifier.getId(),
+                            e);
+                } catch (InvalidDeviceException e) {
+                    throw new DeviceManagementException("Unable to find the device with the id: '" + deviceIdentifier.getId(),
+                            e);
+                }
+            }
+        }
+    }
+
+    /**
+     * Checks for the default group existence and create group based on device ownership
+     *
+     * @param service   {@link GroupManagementProviderService} instance.
+     * @param groupName of the group to create.
+     * @return Group with details.
+     * @throws GroupManagementException
+     */
+    private DeviceGroup createDefaultGroup(GroupManagementProviderService service, String groupName)
+            throws GroupManagementException {
+        DeviceGroup defaultGroup = service.getGroup(groupName);
+        if (defaultGroup == null) {
+            defaultGroup = new DeviceGroup(groupName);
+            // Setting system level user (wso2.system.user) as the owner
+            defaultGroup.setOwner(CarbonConstants.REGISTRY_SYSTEM_USERNAME);
+            defaultGroup.setDescription("Default system group for devices with " + groupName + " ownership.");
+            try {
+                service.createGroup(defaultGroup, DeviceGroupConstants.Roles.DEFAULT_ADMIN_ROLE,
+                        DeviceGroupConstants.Permissions.DEFAULT_ADMIN_PERMISSIONS);
+            } catch (GroupAlreadyExistException e) {
+                if (log.isDebugEnabled()) {
+                    log.debug("Default group: " + defaultGroup.getName() + " already exists. Skipping group creation.",
+                            e);
+                }
+            }
+            return service.getGroup(groupName);
+        } else {
+            return defaultGroup;
+        }
+    }
 }

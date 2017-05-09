@@ -20,7 +20,6 @@ import org.wso2.carbon.device.mgt.common.EnrolmentInfo;
 import org.wso2.carbon.device.mgt.common.app.mgt.Application;
 import org.wso2.carbon.device.mgt.common.group.mgt.DeviceGroup;
 import org.wso2.carbon.device.mgt.core.dto.DeviceType;
-import org.wso2.carbon.device.mgt.core.group.mgt.DeviceGroupBuilder;
 
 import java.util.Date;
 import java.util.Properties;
@@ -79,10 +78,7 @@ public class TestDataHolder {
         DeviceGroup deviceGroup = new DeviceGroup();
         deviceGroup.setName("Test device group");
         deviceGroup.setDescription("Test description");
-        deviceGroup.setDateOfCreation(new Date().getTime());
-        deviceGroup.setDateOfLastUpdate(new Date().getTime());
         deviceGroup.setOwner(OWNER);
-        DeviceGroupBuilder broker = new DeviceGroupBuilder(deviceGroup);
-        return broker.getGroup();
+        return deviceGroup;
     }
 }

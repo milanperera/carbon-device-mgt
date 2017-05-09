@@ -31,7 +31,7 @@
             {{/if}}
 
             <div class="panel-body">
-                <form id="signInForm" method="POST" action="{{@app.context}}/uuf/login">
+                <form id="signInForm" method="POST" action="{{loginActionUrl}}">
                     <div class="form-group">
                         <label for="username">Username *</label>
                         <input type="text" name="username" class="form-control" placeholder="Enter your username"
@@ -39,9 +39,19 @@
                     </div>
                     <div class="form-group">
                         <label for="password">Password *</label>
+<<<<<<< HEAD
                         <input type="password" name="password" class="form-control" autocomplete="off" placeholder="Enter your password"
                                required="required" />
+=======
+                        <!-- Below line is added to stop autocomplete in firefox -->
+                        <input type="password" style="display:none">
+                        <input type="password" name="password" class="form-control" autocomplete="off"
+                               placeholder="Enter your password" required="required" />
+>>>>>>> 964eae6f92d87baed3557b4f72bebe4bd5b4d832
                     </div>
+                    {{#if sessionDataKey}}
+                        <input type="hidden" name="sessionDataKey" value="{{sessionDataKey}}" />
+                    {{/if}}
                     {{#if referer}}
                         <input type="hidden" name="referer" value="{{referer}}" />
                     {{/if}}
@@ -49,7 +59,9 @@
                         <button class="wr-btn btn-download-agent">
                             Login
                         </button>
-                        {{defineZone "signInForm-below" scope="protected"}}
+                        <div id="register-link-wrapper" style="float: right; padding-top: 10px;">
+                            <a href="{{@app.context}}/register" class="pull-right create-account">Create an account</a>
+                        </div>
                     </div>
                 </form>
             </div>

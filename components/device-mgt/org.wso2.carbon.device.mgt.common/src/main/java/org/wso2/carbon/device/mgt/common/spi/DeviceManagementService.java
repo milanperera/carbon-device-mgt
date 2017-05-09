@@ -18,10 +18,9 @@
  */
 package org.wso2.carbon.device.mgt.common.spi;
 
-import org.wso2.carbon.device.mgt.common.DeviceManagementException;
-import org.wso2.carbon.device.mgt.common.DeviceManager;
-import org.wso2.carbon.device.mgt.common.ProvisioningConfig;
+import org.wso2.carbon.device.mgt.common.*;
 import org.wso2.carbon.device.mgt.common.app.mgt.ApplicationManager;
+import org.wso2.carbon.device.mgt.common.policy.mgt.PolicyMonitoringManager;
 import org.wso2.carbon.device.mgt.common.push.notification.PushNotificationConfig;
 
 /**
@@ -34,6 +33,8 @@ public interface DeviceManagementService {
 
     String getType();
 
+    OperationMonitoringTaskConfig getOperationMonitoringConfig();
+
     DeviceManager getDeviceManager();
 
     ApplicationManager getApplicationManager();
@@ -41,5 +42,11 @@ public interface DeviceManagementService {
     ProvisioningConfig getProvisioningConfig();
 
     PushNotificationConfig getPushNotificationConfig();
+
+    PolicyMonitoringManager getPolicyMonitoringManager();
+
+    InitialOperationConfig getInitialOperationConfig();
+
+
 
 }

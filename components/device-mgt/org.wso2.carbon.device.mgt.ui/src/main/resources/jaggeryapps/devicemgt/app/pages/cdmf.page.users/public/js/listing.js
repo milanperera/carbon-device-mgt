@@ -68,10 +68,10 @@ $("a#invite-user-link").click(function () {
         modalDialog.showAsError();
     } else {
         modalDialog.header("");
-        modalDialog.content("An invitation mail will be sent to the selected user(s) to initiate an enrolment process." +
-            " Do you wish to continue ?");
-        modalDialog.footer('<div class="buttons"> <a href="#" id="invite-user-yes-link" class="btn-operations">yes</a>' +
-            '<a href="#" id="invite-user-cancel-link" class="btn-operations btn-default">No</a> </div>');
+        modalDialog.content("An invitation mail will be sent to the selected user(s) to initiate an enrolment " +
+            "process. Do you wish to continue ?");
+        modalDialog.footer('<div class="buttons"><a href="#" id="invite-user-yes-link" class="btn-operations">yes</a>' +
+            '<a href="#" id="invite-user-cancel-link" class="btn-operations btn-default">No</a></div>');
         modalDialog.show();
 
     }
@@ -82,27 +82,27 @@ $("a#invite-user-link").click(function () {
             usernameList,
             function () {
                 modalDialog.header("User invitation email for enrollment was successfully sent.");
-                modalDialog.footer('<div class="buttons"> <a href="#" id="invite-user-success-link" ' +
-                    'class="btn-operations">Ok </a> </div>');
+                modalDialog.footer('<div class="buttons"><a href="#" id="invite-user-success-link" ' +
+                    'class="btn-operations">Ok </a></div>');
                 $("a#invite-user-success-link").click(function () {
-                    modalPopup.hide();
+                    modalDialog.hide();
                 });
             },
             function () {
-                modalDialog.header('<span class="fw-stack"> <i class="fw fw-ring fw-stack-2x"></i> <i class="fw ' +
+                modalDialog.header('<span class="fw-stack"> <i class="fw fw-circle-outline fw-stack-2x"></i> <i class="fw ' +
                     'fw-error fw-stack-1x"></i> </span> Unexpected Error !');
                 modalDialog.content('An unexpected error occurred. Try again later.');
-                modalDialog.footer('<div class="buttons"> <a href="#" id="invite-user-error-link" ' +
-                    'class="btn-operations">Ok </a> </div>');
+                modalDialog.footer('<div class="buttons"><a href="#" id="invite-user-error-link" ' +
+                    'class="btn-operations">Ok </a></div>');
                 $("a#invite-user-error-link").click(function () {
-                    modalPopup.hide();
+                    modalDialog.hide();
                 });
             }
         );
     });
 
     $("a#invite-user-cancel-link").click(function () {
-        modalPopup.hide();
+        modalDialog.hide();
     });
 });
 
@@ -124,7 +124,7 @@ function getSelectedUsernames() {
  * on User Listing page in WSO2 MDM Console.
  */
 function resetPassword(username) {
-    modalDialog.header('<span class="fw-stack"> <i class="fw fw-ring fw-stack-2x"></i> <i class="fw fw-key ' +
+    modalDialog.header('<span class="fw-stack"> <i class="fw fw-circle-outline fw-stack-2x"></i> <i class="fw fw-key ' +
         'fw-stack-1x"></i> </span> Reset Password');
     modalDialog.content($("#modal-content-reset-password").html());
     modalDialog.footer('<div class="buttons"> <a href="#" id="reset-password-yes-link" class="btn-operations"> Save ' +
@@ -258,6 +258,10 @@ function InitiateViewOption() {
     }
 }
 
+function htmlspecialchars(text){
+    return jQuery('<div/>').text(text).html();
+}
+
 function loadUsers() {
     var loadingContentView = "#loading-content";
     $(loadingContentView).show();
@@ -269,11 +273,11 @@ function loadUsers() {
 
         $(data.users).each(function (index) {
             objects.push({
-                filter: data.users[index].username,
-                firstname: data.users[index].firstname ? data.users[index].firstname : "",
-                lastname: data.users[index].lastname ? data.users[index].lastname : "",
-                emailAddress: data.users[index].emailAddress ? data.users[index].emailAddress : "",
-                DT_RowId: "user-" + data.users[index].username
+                filter: htmlspecialchars(data.users[index].username),
+                firstname: htmlspecialchars(data.users[index].firstname) ? htmlspecialchars(data.users[index].firstname) : "",
+                lastname: htmlspecialchars(data.users[index].lastname) ? htmlspecialchars(data.users[index].lastname) : "",
+                emailAddress: htmlspecialchars(data.users[index].emailAddress) ? htmlspecialchars(data.users[index].emailAddress) : "",
+                DT_RowId: "user-" + htmlspecialchars(data.users[index].username)
             })
         });
 
@@ -304,7 +308,7 @@ function loadUsers() {
             }
         },
         {
-            class: "fade-edge",
+            class: "",
             data: null,
             render: function (data, type, row, meta) {
                 if (!data.firstname && !data.lastname) {
@@ -315,14 +319,14 @@ function loadUsers() {
             }
         },
         {
-            class: "fade-edge remove-padding-top",
+            class: "remove-padding-top",
             data: 'filter',
             render: function (filter, type, row, meta) {
                 return '<i class="fw-user"></i>' + filter;
             }
         },
         {
-            class: "fade-edge remove-padding-top",
+            class: "remove-padding-top",
             data: null,
             render: function (data, type, row, meta) {
                 if (!data.emailAddress) {
@@ -333,33 +337,33 @@ function loadUsers() {
             }
         },
         {
-            class: "text-right content-fill text-left-on-grid-view no-wrap",
+            class: "text-right content-fill text-left-on-grid-view no-wrap tooltip-overflow-fix",
             data: null,
             render: function (data, type, row, meta) {
-                var editbtn = '<a data-toggle="tooltip" data-placement="bottom" title="Edit User"href="' + context +
+                var editbtn = '<a data-toggle="tooltip" data-placement="top" title="Edit User"href="' + context +
                     '/user/edit?username=' + encodeURIComponent(data.filter) + '" data-username="' + data.filter + '" ' +
                     'data-click-event="edit-form" ' +
-                    'class="btn padding-reduce-on-grid-view edit-user-link"> ' +
+                    'class="btn padding-reduce-on-grid-view edit-user-link" data-placement="top" data-toggle="tooltip" data-original-title="Edit"> ' +
                     '<span class="fw-stack"> ' +
-                    '<i class="fw fw-ring fw-stack-2x"></i>' +
+                    '<i class="fw fw-circle-outline fw-stack-2x"></i>' +
                     '<i class="fw fw-edit fw-stack-1x"></i>' +
                     '</span><span class="hidden-xs hidden-on-grid-view">Edit</span></a>';
 
-                var resetPasswordbtn = '<a data-toggle="tooltip" data-placement="bottom" title="Reset Password" href="#" data-username="' + data.filter + '" data-userid="' + data.filter + '" ' +
+                var resetPasswordbtn = '<a data-toggle="tooltip" data-placement="top" title="Reset Password" href="#" data-username="' + data.filter + '" data-userid="' + data.filter + '" ' +
                     'data-click-event="edit-form" ' +
                     'onclick="javascript:resetPassword(\'' + data.filter + '\')" ' +
-                    'class="btn padding-reduce-on-grid-view remove-user-link">' +
+                    'class="btn padding-reduce-on-grid-view remove-user-link" data-placement="top" data-toggle="tooltip" data-original-title="Reset Password">' +
                     '<span class="fw-stack">' +
-                    '<i class="fw fw-ring fw-stack-2x"></i>' +
+                    '<i class="fw fw-circle-outline fw-stack-2x"></i>' +
                     '<i class="fw fw-key fw-stack-1x"></i>' +
                     '</span><span class="hidden-xs hidden-on-grid-view">Reset Password</span></a>';
 
-                var removebtn = '<a data-toggle="tooltip" data-placement="bottom" title="Remove User" href="#" data-username="' + data.filter + '" data-userid="' + data.filter + '" ' +
+                var removebtn = '<a data-toggle="tooltip" data-placement="top" title="Remove User" href="#" data-username="' + data.filter + '" data-userid="' + data.filter + '" ' +
                     'data-click-event="remove-form" ' +
                     'onclick="javascript:removeUser(\'' + data.filter + '\')" ' +
-                    'class="btn padding-reduce-on-grid-view remove-user-link">' +
+                    'class="btn padding-reduce-on-grid-view remove-user-link" data-placement="top" data-toggle="tooltip" data-original-title="Remove">' +
                     '<span class="fw-stack">' +
-                    '<i class="fw fw-ring fw-stack-2x"></i>' +
+                    '<i class="fw fw-circle-outline fw-stack-2x"></i>' +
                     '<i class="fw fw-delete fw-stack-1x"></i>' +
                     '</span><span class="hidden-xs hidden-on-grid-view">Remove</span></a>';
 

@@ -19,7 +19,6 @@
 var carbonModule = require("carbon");
 var devicemgtProps = require("/app/modules/conf-reader/main.js")["conf"];
 var userModule = require("/app/modules/business-controllers/user.js")["userModule"];
-var utility = require("/app/modules/utility.js")["utility"];
 
 //noinspection JSUnresolvedFunction Server
 var carbonServer = new carbonModule.server.Server({
@@ -29,9 +28,23 @@ var carbonServer = new carbonModule.server.Server({
 
 application.put("carbonServer", carbonServer);
 
-//var permissions = {
-//    "/permission/admin/device-mgt/user": ["ui.execute"],
-//    "/permission/admin/manage/api/subscribe": ["ui.execute"]
-//};
+var permissions = {
+    "/permission/admin/Login": ["ui.execute"],
+    "/permission/admin/device-mgt/device/api/subscribe": ["ui.execute"],
+	"/permission/admin/device-mgt/devices/enroll": ["ui.execute"],
+	"/permission/admin/device-mgt/devices/disenroll": ["ui.execute"],
+	"/permission/admin/device-mgt/devices/owning-device/view": ["ui.execute"],
+	"/permission/admin/manage/portal": ["ui.execute"]
+};
 
-//userModule.addRole("internal/devicemgt-user", ["admin"], permissions);
+var adminPermissions = {
+    "/permission/admin/device-mgt": ["ui.execute"],
+	"/permission/admin/manage/api": ["ui.execute"],
+	"/permission/admin/manage/portal": ["ui.execute"]
+};
+
+//On Startup, admin user will get both roles: devicemgt-admin and devicemgt-user
+//Average user through sign-up will only receive the role: devicemgt-user.
+//Admin can setup necessary permissions for the role: devicemgt-user
+userModule.addRole("internal/devicemgt-user", ["admin"], permissions);
+userModule.addRole("internal/devicemgt-admin", ["admin"], adminPermissions);

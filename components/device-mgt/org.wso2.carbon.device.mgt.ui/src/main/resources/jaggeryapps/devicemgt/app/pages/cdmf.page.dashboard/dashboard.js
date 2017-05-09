@@ -16,13 +16,18 @@
  * under the License.
  */
 
-function onRequest() {
+function onRequest(context) {
     var constants = require("/app/modules/constants.js");
     var userModule = require("/app/modules/business-controllers/user.js")["userModule"];
     var devicemgtProps = require("/app/modules/conf-reader/main.js")["conf"];
     var deviceModule = require("/app/modules/business-controllers/device.js")["deviceModule"];
     var groupModule = require("/app/modules/business-controllers/group.js")["groupModule"];
     var policyModule = require("/app/modules/business-controllers/policy.js")["policyModule"];
+
+    if(!session.get(constants["TOKEN_PAIR"])){
+        response.sendRedirect(context.app.context + "/welcome");
+        return;
+    }
 
     var user = session.get(constants["USER_SESSION_KEY"]);
     var permissions = userModule.getUIPermissions();
@@ -36,12 +41,14 @@ function onRequest() {
     viewModel.permissions = permissions;
     viewModel.enrollmentURL = devicemgtProps.enrollmentURL;
     viewModel.deviceCount = deviceModule.getDevicesCount();
-    //TODO: Enable Group Management Service API on CDMF
-    //page.group_count = groupModule.getGroupCount();
-    viewModel.groupCount = -1;
+    viewModel.groupCount = groupModule.getGroupCount();
     viewModel.userCount = userModule.getUsersCount();
     viewModel.policyCount = policyModule.getPoliciesCount();
-    viewModel.roleCount = userModule.getRolesCount();
-
+    viewModel.isCloud = devicemgtProps.isCloud;
+    if (devicemgtProps.isCloud) {
+        viewModel.roleCount = userModule.getFilteredRoles("devicemgt").content.count;
+    } else {
+        viewModel.roleCount = userModule.getRolesCount();
+    }
     return viewModel;
 }

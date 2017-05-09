@@ -20,12 +20,16 @@ package org.wso2.carbon.policy.mgt.core.mgt.impl;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.wso2.carbon.context.CarbonContext;
 import org.wso2.carbon.device.mgt.common.Device;
 import org.wso2.carbon.device.mgt.common.DeviceIdentifier;
 import org.wso2.carbon.device.mgt.common.DeviceManagementException;
 import org.wso2.carbon.device.mgt.common.group.mgt.DeviceGroup;
 import org.wso2.carbon.device.mgt.common.group.mgt.GroupManagementException;
+import org.wso2.carbon.device.mgt.common.policy.mgt.DeviceGroupWrapper;
+import org.wso2.carbon.device.mgt.common.policy.mgt.Policy;
+import org.wso2.carbon.device.mgt.common.policy.mgt.PolicyCriterion;
+import org.wso2.carbon.device.mgt.common.policy.mgt.Profile;
+import org.wso2.carbon.device.mgt.common.policy.mgt.ProfileFeature;
 import org.wso2.carbon.device.mgt.core.service.DeviceManagementProviderService;
 import org.wso2.carbon.device.mgt.core.service.DeviceManagementProviderServiceImpl;
 import org.wso2.carbon.device.mgt.core.service.GroupManagementProviderService;
@@ -35,6 +39,7 @@ import org.wso2.carbon.policy.mgt.core.cache.impl.PolicyCacheManagerImpl;
 import org.wso2.carbon.policy.mgt.core.dao.*;
 import org.wso2.carbon.policy.mgt.core.mgt.PolicyManager;
 import org.wso2.carbon.policy.mgt.core.mgt.ProfileManager;
+import org.wso2.carbon.policy.mgt.core.mgt.bean.UpdatedPolicyDeviceListBean;
 import org.wso2.carbon.policy.mgt.core.util.PolicyManagerUtil;
 
 import java.sql.SQLException;
@@ -826,15 +831,15 @@ public class PolicyManagerImpl implements PolicyManager {
     }
 
     @Override
-    public List<String> applyChangesMadeToPolicies() throws PolicyManagementException {
+    public UpdatedPolicyDeviceListBean applyChangesMadeToPolicies() throws PolicyManagementException {
 
         List<String> changedDeviceTypes = new ArrayList<>();
+        List<Policy> updatedPolicies = new ArrayList<>();
+        List<Integer> updatedPolicyIds = new ArrayList<>();
         try {
             //HashMap<Integer, Integer> map = policyDAO.getUpdatedPolicyIdandDeviceTypeId();
-            List<Policy> updatedPolicies = new ArrayList<>();
 //            List<Policy> activePolicies = new ArrayList<>();
 //            List<Policy> inactivePolicies = new ArrayList<>();
-            List<Integer> updatedPolicyIds = new ArrayList<>();
 
 //            List<Policy> allPolicies = this.getPolicies();
             List<Policy> allPolicies = PolicyCacheManagerImpl.getInstance().getAllPolicies();
@@ -863,7 +868,7 @@ public class PolicyManagerImpl implements PolicyManager {
         } finally {
             PolicyManagementDAOFactory.closeConnection();
         }
-        return changedDeviceTypes;
+        return new UpdatedPolicyDeviceListBean(updatedPolicies, updatedPolicyIds, changedDeviceTypes);
     }
 
 
@@ -880,9 +885,7 @@ public class PolicyManagerImpl implements PolicyManager {
 
             Policy policySaved = policyDAO.getAppliedPolicy(deviceId, device.getEnrolmentInfo().getId());
             if (policySaved != null && policySaved.getId() != 0) {
-//                if (policy.getId() != policySaved.getId()) {
-                    policyDAO.updateEffectivePolicyToDevice(deviceId, device.getEnrolmentInfo().getId(), policy);
-//                }
+                policyDAO.updateEffectivePolicyToDevice(deviceId, device.getEnrolmentInfo().getId(), policy);
             } else {
                 policyDAO.addEffectivePolicyToDevice(deviceId, device.getEnrolmentInfo().getId(), policy);
             }
@@ -912,17 +915,17 @@ public class PolicyManagerImpl implements PolicyManager {
 
             Policy policySaved = policyDAO.getAppliedPolicy(deviceId, device.getEnrolmentInfo().getId());
             if (policySaved != null) {
-                 policyDAO.deleteEffectivePolicyToDevice(deviceId, device.getEnrolmentInfo().getId());
+                policyDAO.deleteEffectivePolicyToDevice(deviceId, device.getEnrolmentInfo().getId());
             }
             PolicyManagementDAOFactory.commitTransaction();
         } catch (PolicyManagerDAOException e) {
             PolicyManagementDAOFactory.rollbackTransaction();
             throw new PolicyManagementException("Error occurred while removing the applied policy to device (" +
-                                                deviceId + ")", e);
+                    deviceId + ")", e);
         } catch (DeviceManagementException e) {
             PolicyManagementDAOFactory.rollbackTransaction();
             throw new PolicyManagementException("Error occurred while getting the device details (" +
-                                                deviceIdentifier.getId() + ")", e);
+                    deviceIdentifier.getId() + ")", e);
         } finally {
             PolicyManagementDAOFactory.closeConnection();
         }

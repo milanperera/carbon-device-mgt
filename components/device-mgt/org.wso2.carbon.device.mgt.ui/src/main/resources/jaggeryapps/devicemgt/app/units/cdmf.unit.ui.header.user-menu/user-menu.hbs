@@ -15,6 +15,7 @@
   specific language governing permissions and limitations
   under the License.
 }}
+<<<<<<< HEAD
 {{#zone "userMenu"}}
     <ul class="nav navbar-right float-remove-xs text-center-xs">
         <li class="visible-inline-block">
@@ -92,36 +93,13 @@
                         </div>
                     </div>
                 </div>
+=======
+>>>>>>> 964eae6f92d87baed3557b4f72bebe4bd5b4d832
 
-                <div id="change-password-success-content" class="hide">
-                    <div class="modal-header">
-                        <h4 class="pull-left modal-title">
-                <span class="fw-stack fw-move-right fw-move-bottom">
-                    <i class="fw fw-circle fw-stack-2x fw-stroke text-success"></i>
-                    <i class="fw fw-check fw-stack-1x fw-inverse"></i>
-                </span>
-                            Password has been successfully updated
-                        </h4>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><i
-                                class="fw fw-cancel"></i></button>
-                    </div>
-                    <hr>
-                    <div class="modal-body add-margin-top-2x add-margin-bottom-2x">
-                        <h5 class="text-center">
-                            You can now try to login using your new password.
-                        </h5>
-                    </div>
-                    <div class="modal-footer">
-                        <div class="buttons">
-                            <a href="#" id="change-password-success-link" class="btn-operations">Ok</a>
-                        </div>
-                    </div>
-                </div>
-            </ul>
-        </li>
-    </ul>
-{{/zone}}
-
-{{#zone "bottomJs"}}
-    {{js "/js/user-menu.js"}}
+{{#zone "userMenu"}}
+    {{#if isCloud}}
+        {{unit "cdmf.unit.ui.header.cloud.user-menu"}}
+    {{else}}
+        {{unit "cdmf.unit.ui.header.default.user-menu"}}
+    {{/if}}
 {{/zone}}

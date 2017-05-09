@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
+ * Copyright (c) 2016-2017, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
  *
  * WSO2 Inc. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
@@ -29,7 +29,7 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.message.BasicNameValuePair;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;;
+import org.json.simple.parser.ParseException;
 import org.wso2.carbon.identity.jwt.client.extension.constant.JWTConstants;
 import org.wso2.carbon.identity.jwt.client.extension.dto.AccessTokenInfo;
 import org.wso2.carbon.identity.jwt.client.extension.dto.JWTConfig;
@@ -73,9 +73,30 @@ public class JWTClient {
 			throw new JWTClientException("JWT is not configured properly for user : " + username);
 		}
 		params.add(new BasicNameValuePair(JWTConstants.JWT_PARAM_NAME, assertion));
-		params.add(new BasicNameValuePair(JWTConstants.SCOPE_PARAM_NAME, scopes));
+        if (scopes != null && !scopes.isEmpty()) {
+            params.add(new BasicNameValuePair(JWTConstants.SCOPE_PARAM_NAME, scopes));
+        }
 		return getTokenInfo(params, consumerKey, consumerSecret);
 	}
+
+    public AccessTokenInfo getAccessToken(String encodedAppcredential, String username, String scopes)
+            throws JWTClientException {
+        List<NameValuePair> params = new ArrayList<>();
+        params.add(new BasicNameValuePair(JWTConstants.GRANT_TYPE_PARAM_NAME, jwtConfig.getJwtGrantType()));
+        String assertion = JWTClientUtil.generateSignedJWTAssertion(username, jwtConfig, isDefaultJWTClient);
+        if (assertion == null) {
+            throw new JWTClientException("JWT is not configured properly for user : " + username);
+        }
+        params.add(new BasicNameValuePair(JWTConstants.JWT_PARAM_NAME, assertion));
+        if (scopes != null && !scopes.isEmpty()) {
+            params.add(new BasicNameValuePair(JWTConstants.SCOPE_PARAM_NAME, scopes));
+        }
+        String decodedKey[] = getDecodedKey(encodedAppcredential);
+        if (decodedKey.length != 2) {
+            throw new JWTClientException("Invalid app credential");
+        }
+        return getTokenInfo(params, decodedKey[0], decodedKey[1]);
+    }
 
 	public AccessTokenInfo getAccessToken(String consumerKey, String consumerSecret, String username, String scopes,
 										  Map<String, String> paramsMap)
@@ -87,7 +108,9 @@ public class JWTClient {
 			throw new JWTClientException("JWT is not configured properly for user : " + username);
 		}
 		params.add(new BasicNameValuePair(JWTConstants.JWT_PARAM_NAME, assertion));
-		params.add(new BasicNameValuePair(JWTConstants.SCOPE_PARAM_NAME, scopes));
+        if (scopes != null && !scopes.isEmpty()) {
+            params.add(new BasicNameValuePair(JWTConstants.SCOPE_PARAM_NAME, scopes));
+        }
 		if (paramsMap != null) {
 			for (String key : paramsMap.keySet()) {
 				params.add(new BasicNameValuePair(key, paramsMap.get(key)));
@@ -132,9 +155,12 @@ public class JWTClient {
 			String accessToken = (String) jsonObject.get(JWTConstants.ACCESS_TOKEN_GRANT_TYPE_PARAM_NAME);
 			if (accessToken != null && !accessToken.isEmpty()) {
 				accessTokenInfo.setAccessToken(accessToken);
-				accessTokenInfo.setRefreshToken((String) jsonObject.get(JWTConstants.REFRESH_TOKEN_GRANT_TYPE_PARAM_NAME));
+				accessTokenInfo.setRefreshToken((String) jsonObject.get(
+                        JWTConstants.REFRESH_TOKEN_GRANT_TYPE_PARAM_NAME));
 				accessTokenInfo.setExpiresIn((Long) jsonObject.get(JWTConstants.OAUTH_EXPIRES_IN));
 				accessTokenInfo.setTokenType((String) jsonObject.get(JWTConstants.OAUTH_TOKEN_TYPE));
+                accessTokenInfo.setScopes((String) jsonObject.get(JWTConstants.OAUTH_TOKEN_SCOPE));
+
 			}
 			return accessTokenInfo;
 		} catch (MalformedURLException e) {
@@ -156,7 +182,26 @@ public class JWTClient {
 		return new String(Base64.encodeBase64((consumerKey + ":" + consumerSecret).getBytes()));
 	}
 
+    private String[] getDecodedKey(String encodedKey) {
+        return (new String(Base64.decodeBase64((encodedKey).getBytes()))).split(":");
+    }
 
+    public String getJwtToken(String username) throws JWTClientException {
+		return JWTClientUtil.generateSignedJWTAssertion(username, jwtConfig, isDefaultJWTClient);
+	}
+
+    public String getJwtToken(String username, Map<String, String> claims) throws JWTClientException {
+        return JWTClientUtil.generateSignedJWTAssertion(username, jwtConfig, isDefaultJWTClient, claims);
+    }
+
+    public String getJwtToken(String username, Map<String, String> claims, boolean enableTenantSigning)
+            throws JWTClientException {
+        if (enableTenantSigning) {
+            return JWTClientUtil.generateSignedJWTAssertion(username, jwtConfig, false, claims);
+        } else {
+            return getJwtToken(username, claims);
+        }
+    }
 }
 
 
