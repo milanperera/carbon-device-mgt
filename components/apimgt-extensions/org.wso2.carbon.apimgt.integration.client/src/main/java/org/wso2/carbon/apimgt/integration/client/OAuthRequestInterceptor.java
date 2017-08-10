@@ -102,7 +102,8 @@ public class OAuthRequestInterceptor implements RequestInterceptor {
                 tenantBasedAccessTokenInfo.setExpiresIn(
                         System.currentTimeMillis() + (tenantBasedAccessTokenInfo.getExpiresIn() * 1000));
                 if (tenantBasedAccessTokenInfo.getScopes() == null) {
-                    throw new APIMClientOAuthException("Failed to retrieve scopes from access token");
+                    throw new APIMClientOAuthException("Failed to retrieve oauth token using jwt client, hence failed" +
+                            " to retrieve scopes from access token");
                 }
 
                 if (tenantBasedAccessTokenInfo.getScopes().contains(APIM_SUBSCRIBE_SCOPE)) {
