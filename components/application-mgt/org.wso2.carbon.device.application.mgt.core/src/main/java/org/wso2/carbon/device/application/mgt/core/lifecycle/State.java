@@ -1,0 +1,25 @@
+package org.wso2.carbon.device.application.mgt.core.lifecycle;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+public class State {
+
+    private Set<String> proceedingStates;
+    private String stateName;
+
+    public State(String stateName, List<String> states) {
+        this.stateName = stateName;
+        proceedingStates = new HashSet<>(states);
+    }
+
+    public String getState() {
+        return stateName;
+    }
+
+    public Set<String> getProceedingStates() {
+        return proceedingStates;
+    }
+
+}
