@@ -6,6 +6,9 @@ import org.wso2.carbon.device.application.mgt.core.config.ConfigurationManager;
 
 import java.io.File;
 
+/**
+ * This class initializes the required configurations prior running the tests
+ */
 public class InitTest {
 
     @BeforeSuite

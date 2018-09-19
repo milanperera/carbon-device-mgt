@@ -7,6 +7,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * This class represents the activities related to lifecycle management
+ */
 public class LifecycleStateManger {
 
     private Map<String, State> lifecycleStates;

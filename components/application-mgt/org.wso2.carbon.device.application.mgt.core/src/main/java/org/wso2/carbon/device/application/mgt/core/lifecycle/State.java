@@ -4,6 +4,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * This class represents the state of the lifecycle
+ */
 public class State {
 
     private Set<String> proceedingStates;

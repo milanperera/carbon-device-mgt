@@ -3,13 +3,11 @@ package org.wso2.carbon.device.application.mgt.core;
 import org.junit.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import org.wso2.carbon.device.application.mgt.common.exception.InvalidConfigurationException;
 import org.wso2.carbon.device.application.mgt.core.config.Configuration;
 import org.wso2.carbon.device.application.mgt.core.config.ConfigurationManager;
 import org.wso2.carbon.device.application.mgt.core.lifecycle.LifecycleStateManger;
 import org.wso2.carbon.device.application.mgt.core.lifecycle.config.LifecycleState;
 
-import java.io.File;
 import java.util.List;
 import java.util.Set;
 

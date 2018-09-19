@@ -5,6 +5,9 @@ import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlElementWrapper;
 import java.util.List;
 
+/**
+ * This class represents the lifecycle state config
+ */
 public class LifecycleState {
 
     private String name;
