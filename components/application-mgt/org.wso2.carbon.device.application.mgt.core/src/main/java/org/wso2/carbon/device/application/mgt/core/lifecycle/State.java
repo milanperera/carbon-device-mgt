@@ -11,7 +11,9 @@ public class State {
 
     public State(String stateName, List<String> states) {
         this.stateName = stateName;
-        proceedingStates = new HashSet<>(states);
+        if (states != null && !states.isEmpty()) {
+            proceedingStates = new HashSet<>(states);
+        }
     }
 
     public String getState() {
